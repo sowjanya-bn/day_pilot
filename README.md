@@ -68,7 +68,7 @@ Then open in Expo Go or an emulator.
 
 ## Naming
 
-Project name: **AchieveMate**
+Project name: **DayPilot**
 
 ## Notes
 
