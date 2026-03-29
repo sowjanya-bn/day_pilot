@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.routes import health, planner, checkin
+from app.api.routes import checkin, health, planner
 from app.core.config import settings
 
 app = FastAPI(title=settings.app_name, version="0.1.0")
@@ -21,4 +21,4 @@ app.include_router(checkin.router, prefix="/api")
 
 @app.get("/")
 def root() -> dict[str, str]:
-    return {"message": "AchieveMate backend is running"}
+    return {"message": "DayPilot backend is running"}
