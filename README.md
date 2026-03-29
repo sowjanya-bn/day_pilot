@@ -1,4 +1,4 @@
-# ya
+# Day Pilot
 
 A starter project for a goal-oriented companion app that helps with:
 
