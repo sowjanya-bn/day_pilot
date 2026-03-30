@@ -3,9 +3,10 @@ from typing import Optional
 
 from pydantic import BaseModel
 
-from app.models.planner import TomorrowPlanResponse
 from app.models.checkin import DailyCheckinResponse
 from app.models.guidance import CarryForwardResponse
+from app.models.planner import TomorrowPlanResponse
+from app.models.stats import DailyStatsResponse
 
 
 class DailyBriefResponse(BaseModel):
@@ -13,3 +14,4 @@ class DailyBriefResponse(BaseModel):
     plan: Optional[TomorrowPlanResponse] = None
     yesterday_reflection: Optional[DailyCheckinResponse] = None
     guidance: CarryForwardResponse
+    stats: DailyStatsResponse
