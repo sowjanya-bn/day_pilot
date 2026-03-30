@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "AchieveMate",
-    "slug": "achievemate",
+    "name": "DayPilot",
+    "slug": "daypilot",
     "version": "0.1.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",

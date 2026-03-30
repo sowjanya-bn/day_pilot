@@ -1,16 +1,185 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useState } from "react";
 import {
   SafeAreaView,
   ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
   View,
-} from 'react-native';
-import { StatusBar } from 'expo-status-bar';
+  Text,
+  StyleSheet,
+  ActivityIndicator,
+} from "react-native";
 
-const TABS = ['Plan Tomorrow', 'Check In', 'Ideas'];
+const API_BASE_URL = "http://localhost:8000/api";
+const DEFAULT_DATE = "2026-03-30";
+
+export default function App() {
+  const [brief, setBrief] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    const loadDailyBrief = async () => {
+      try {
+        setLoading(true);
+        setError("");
+
+        const response = await fetch(
+          `${API_BASE_URL}/daily-brief/${DEFAULT_DATE}`
+        );
+
+        if (!response.ok) {
+          throw new Error(`Request failed: ${response.status}`);
+        }
+
+        const data = await response.json();
+        setBrief(data);
+      } catch (err) {
+        setError(err.message || "Something went wrong");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadDailyBrief();
+  }, []);
+
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.centered}>
+        <ActivityIndicator size="large" />
+        <Text style={styles.helperText}>Loading DayPilot...</Text>
+      </SafeAreaView>
+    );
+  }
+
+  if (error) {
+    return (
+      <SafeAreaView style={styles.centered}>
+        <Text style={styles.errorText}>Could not load daily brief</Text>
+        <Text style={styles.helperText}>{error}</Text>
+      </SafeAreaView>
+    );
+  }
+
+  const { guidance, stats, plan, yesterday_reflection } = brief;
+
+  return (
+    <SafeAreaView style={styles.container}>
+      <ScrollView contentContainerStyle={styles.content}>
+        <Text style={styles.title}>DayPilot</Text>
+        <Text style={styles.subtitle}>Your daily brief</Text>
+
+        <Card title="Focus">
+          <Text style={styles.focusText}>{guidance?.focus_message}</Text>
+        </Card>
+
+        <Card title="Carry-forward tasks">
+          {guidance?.carry_forward_tasks?.length ? (
+            guidance.carry_forward_tasks.map((task, index) => (
+              <Text key={index} style={styles.listItem}>
+                • {task}
+              </Text>
+            ))
+          ) : (
+            <Text style={styles.muted}>No carry-forward tasks</Text>
+          )}
+        </Card>
+
+        <Card title="Guidance">
+          <Text style={styles.label}>Learning</Text>
+          <Text style={styles.value}>
+            {guidance?.suggested_learning_next_step || "—"}
+          </Text>
+
+          <Text style={styles.label}>Job</Text>
+          <Text style={styles.value}>
+            {guidance?.suggested_job_nudge || "—"}
+          </Text>
+
+          <Text style={styles.label}>Social</Text>
+          <Text style={styles.value}>
+            {guidance?.suggested_social_nudge || "—"}
+          </Text>
+        </Card>
+
+        <Card title="Stats">
+          <Text style={styles.value}>
+            Planning streak: {stats?.planning_streak ?? 0}
+          </Text>
+          <Text style={styles.value}>
+            Check-in streak: {stats?.checkin_streak ?? 0}
+          </Text>
+          <Text style={styles.value}>
+            Completed in last 7 days: {stats?.completed_tasks_last_7_days ?? 0}
+          </Text>
+          <Text style={styles.value}>
+            Incomplete in last 7 days: {stats?.incomplete_tasks_last_7_days ?? 0}
+          </Text>
+        </Card>
+
+        <Card title="Today's plan">
+          <Text style={styles.label}>Agenda</Text>
+          <Text style={styles.value}>{plan?.agenda || "—"}</Text>
+
+          <Text style={styles.label}>Top priorities</Text>
+          {plan?.top_priorities?.length ? (
+            plan.top_priorities.map((item, index) => (
+              <Text key={index} style={styles.listItem}>
+                • {item}
+              </Text>
+            ))
+          ) : (
+            <Text style={styles.muted}>No priorities set</Text>
+          )}
+
+          <Text style={styles.label}>Learning goal</Text>
+          <Text style={styles.value}>{plan?.learning_goal || "—"}</Text>
+
+          <Text style={styles.label}>Job goal</Text>
+          <Text style={styles.value}>{plan?.job_goal || "—"}</Text>
+
+          <Text style={styles.label}>Social goal</Text>
+          <Text style={styles.value}>{plan?.social_goal || "—"}</Text>
+        </Card>
+
+        <Card title="Yesterday's reflection">
+          <Text style={styles.label}>Mood</Text>
+          <Text style={styles.value}>{yesterday_reflection?.mood || "—"}</Text>
+
+          <Text style={styles.label}>Completed</Text>
+          {yesterday_reflection?.completed?.length ? (
+            yesterday_reflection.completed.map((item, index) => (
+              <Text key={index} style={styles.listItem}>
+                • {item}
+              </Text>
+            ))
+          ) : (
+            <Text style={styles.muted}>No completed tasks</Text>
+          )}
+
+          <Text style={styles.label}>Incomplete</Text>
+          {yesterday_reflection?.incomplete?.length ? (
+            yesterday_reflection.incomplete.map((item, index) => (
+              <Text key={index} style={styles.listItem}>
+                • {item}
+              </Text>
+            ))
+          ) : (
+            <Text style={styles.muted}>No incomplete tasks</Text>
+          )}
+
+          <Text style={styles.label}>Learned</Text>
+          <Text style={styles.value}>{yesterday_reflection?.learned || "—"}</Text>
+
+          <Text style={styles.label}>Small win</Text>
+          <Text style={styles.value}>{yesterday_reflection?.small_win || "—"}</Text>
+
+          <Text style={styles.label}>Notes</Text>
+          <Text style={styles.value}>{yesterday_reflection?.notes || "—"}</Text>
+        </Card>
+      </ScrollView>
+    </SafeAreaView>
+  );
+}
 
 function Card({ title, children }) {
   return (
@@ -21,224 +190,79 @@ function Card({ title, children }) {
   );
 }
 
-function PillTabs({ activeTab, onChange }) {
-  return (
-    <View style={styles.tabRow}>
-      {TABS.map((tab) => {
-        const active = activeTab === tab;
-        return (
-          <TouchableOpacity
-            key={tab}
-            onPress={() => onChange(tab)}
-            style={[styles.tab, active && styles.tabActive]}
-          >
-            <Text style={[styles.tabText, active && styles.tabTextActive]}>{tab}</Text>
-          </TouchableOpacity>
-        );
-      })}
-    </View>
-  );
-}
-
-export default function App() {
-  const [activeTab, setActiveTab] = useState('Plan Tomorrow');
-  const [agenda, setAgenda] = useState('');
-  const [priorities, setPriorities] = useState('');
-  const [learningGoal, setLearningGoal] = useState('');
-  const [socialGoal, setSocialGoal] = useState('');
-
-  const [completed, setCompleted] = useState('');
-  const [incomplete, setIncomplete] = useState('');
-  const [blockers, setBlockers] = useState('');
-  const [carryForward, setCarryForward] = useState('');
-  const [notes, setNotes] = useState('');
-
-  const starterIdeas = useMemo(
-    () => [
-      'Learning: pull next coursework step and attach one useful link',
-      'Jobs: fetch recent roles from saved keywords',
-      'Social: suggest one small reach-out action',
-      'Notifications: morning reminder and evening check-in buzz',
-    ],
-    []
-  );
-
-  return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar style="auto" />
-      <ScrollView contentContainerStyle={styles.content}>
-        <Text style={styles.title}>AchieveMate</Text>
-        <Text style={styles.subtitle}>A gentle, goal-oriented companion</Text>
-
-        <PillTabs activeTab={activeTab} onChange={setActiveTab} />
-
-        {activeTab === 'Plan Tomorrow' && (
-          <Card title="Tomorrow Planner">
-            <Text style={styles.label}>Agenda</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="What needs to happen tomorrow?"
-              value={agenda}
-              onChangeText={setAgenda}
-            />
-
-            <Text style={styles.label}>Top priorities</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Comma-separated priorities"
-              value={priorities}
-              onChangeText={setPriorities}
-            />
-
-            <Text style={styles.label}>Learning goal</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="What do you want to learn next?"
-              value={learningGoal}
-              onChangeText={setLearningGoal}
-            />
-
-            <Text style={styles.label}>Social goal</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="One gentle social action"
-              value={socialGoal}
-              onChangeText={setSocialGoal}
-            />
-
-            <TouchableOpacity style={styles.button}>
-              <Text style={styles.buttonText}>Save plan</Text>
-            </TouchableOpacity>
-          </Card>
-        )}
-
-        {activeTab === 'Check In' && (
-          <Card title="End-of-day Check-in">
-            <Text style={styles.label}>Completed</Text>
-            <TextInput style={styles.input} value={completed} onChangeText={setCompleted} placeholder="What got done?" />
-
-            <Text style={styles.label}>Incomplete</Text>
-            <TextInput style={styles.input} value={incomplete} onChangeText={setIncomplete} placeholder="What did not get done?" />
-
-            <Text style={styles.label}>Blockers</Text>
-            <TextInput style={styles.input} value={blockers} onChangeText={setBlockers} placeholder="What got in the way?" />
-
-            <Text style={styles.label}>Carry forward</Text>
-            <TextInput style={styles.input} value={carryForward} onChangeText={setCarryForward} placeholder="What should move to tomorrow?" />
-
-            <Text style={styles.label}>Notes</Text>
-            <TextInput style={[styles.input, styles.textArea]} multiline value={notes} onChangeText={setNotes} placeholder="Any quick reflection?" />
-
-            <TouchableOpacity style={styles.button}>
-              <Text style={styles.buttonText}>Save check-in</Text>
-            </TouchableOpacity>
-          </Card>
-        )}
-
-        {activeTab === 'Ideas' && (
-          <Card title="Next modules">
-            {starterIdeas.map((idea) => (
-              <View key={idea} style={styles.ideaRow}>
-                <Text style={styles.ideaBullet}>•</Text>
-                <Text style={styles.ideaText}>{idea}</Text>
-              </View>
-            ))}
-          </Card>
-        )}
-      </ScrollView>
-    </SafeAreaView>
-  );
-}
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f7f7f7',
+    backgroundColor: "#f6f7fb",
   },
   content: {
     padding: 20,
+    paddingBottom: 40,
     gap: 16,
   },
+  centered: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 24,
+  },
   title: {
-    fontSize: 30,
-    fontWeight: '700',
-    marginTop: 12,
+    fontSize: 28,
+    fontWeight: "700",
   },
   subtitle: {
-    fontSize: 15,
-    color: '#555',
+    fontSize: 16,
+    color: "#666",
     marginBottom: 8,
   },
-  tabRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  tab: {
-    backgroundColor: '#e8e8e8',
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 999,
-  },
-  tabActive: {
-    backgroundColor: '#222',
-  },
-  tabText: {
-    color: '#333',
-    fontWeight: '600',
-  },
-  tabTextActive: {
-    color: '#fff',
-  },
   card: {
-    backgroundColor: '#fff',
-    borderRadius: 18,
+    backgroundColor: "white",
+    borderRadius: 16,
     padding: 16,
-    gap: 10,
+    shadowColor: "#000",
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 2,
   },
   cardTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    marginBottom: 4,
+    fontSize: 18,
+    fontWeight: "600",
+    marginBottom: 12,
+  },
+  focusText: {
+    fontSize: 16,
+    lineHeight: 24,
   },
   label: {
     fontSize: 14,
-    fontWeight: '600',
-    marginTop: 6,
-  },
-  input: {
-    backgroundColor: '#f0f0f0',
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-  },
-  textArea: {
-    minHeight: 100,
-    textAlignVertical: 'top',
-  },
-  button: {
+    fontWeight: "600",
     marginTop: 10,
-    backgroundColor: '#222',
-    borderRadius: 12,
-    paddingVertical: 14,
-    alignItems: 'center',
+    marginBottom: 4,
   },
-  buttonText: {
-    color: '#fff',
-    fontWeight: '700',
+  value: {
+    fontSize: 15,
+    lineHeight: 22,
+    color: "#222",
   },
-  ideaRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 8,
+  listItem: {
+    fontSize: 15,
+    lineHeight: 22,
+    marginBottom: 4,
+    color: "#222",
   },
-  ideaBullet: {
+  muted: {
+    fontSize: 14,
+    color: "#777",
+  },
+  helperText: {
+    marginTop: 8,
+    color: "#666",
+    textAlign: "center",
+  },
+  errorText: {
     fontSize: 18,
-    lineHeight: 22,
-  },
-  ideaText: {
-    flex: 1,
-    color: '#333',
-    lineHeight: 22,
+    fontWeight: "600",
+    color: "#b00020",
   },
 });
