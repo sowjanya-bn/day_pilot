@@ -44,8 +44,44 @@ def get_carry_forward(session: Session, day: date) -> CarryForwardResponse:
     return CarryForwardResponse(
         date=day,
         carry_forward_tasks=carry_forward_tasks,
-        suggested_learning_next_step="Spend 20 minutes on your current learning goal.",
-        suggested_job_nudge="Take one small job-search action today.",
-        suggested_social_nudge="Send one small message or check in with someone.",
+        suggested_learning_next_step=build_learning_next_step(previous),
+        suggested_job_nudge=build_job_nudge(previous),
+        suggested_social_nudge=build_social_nudge(previous),
         focus_message=focus_message,
     )
+
+def build_learning_next_step(previous):
+    if not previous:
+        return "Spend 20 minutes on your current learning goal."
+
+    learned = previous.learned
+    if learned:
+        return f"Build on yesterday’s learning: {learned}"
+
+    return "Spend 20 minutes reviewing your learning goal."
+
+
+def build_job_nudge(previous):
+    if not previous:
+        return "Take one small job-search step today."
+
+    mood = previous.mood
+    blockers = previous.blockers
+
+    if mood in ["low", "overwhelmed"] or blockers:
+        return "Keep it light: review one job or tweak one CV bullet."
+
+    return "Apply to one role or refine one CV section."
+
+
+def build_social_nudge(previous):
+    if not previous:
+        return "Send one small message."
+
+    mood = previous.mood
+
+    if mood in ["low", "overwhelmed"]:
+        return "Keep it gentle: even one message is enough."
+
+    return "Reach out or start one small conversation."
+
