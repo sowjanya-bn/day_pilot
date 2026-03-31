@@ -56,6 +56,7 @@ def create_checkin(session: Session, payload: DailyCheckinCreate) -> DailyChecki
             title=item,
             category="general",
             source="checkin",
+            assigned_date=payload.date,
         )
 
         mark_task_completed(session, task)

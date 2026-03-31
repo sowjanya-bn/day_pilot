@@ -1,9 +1,3 @@
-from datetime import datetime
-
-from sqlmodel import Session, select
-
-from app.models.entities import TaskEntity
-from app.models.task import TaskStatus
 from datetime import date, datetime
 
 from fastapi import HTTPException, status
@@ -11,11 +5,11 @@ from sqlmodel import Session, select
 
 from app.models.entities import TaskEntity
 from app.models.task import (
+    DailyTaskCreate,
     DailyTaskListResponse,
     TaskResponse,
     TaskStatus,
 )
-
 
 
 def normalize_title(title: str) -> str:
@@ -34,7 +28,13 @@ def find_existing_task(session: Session, title: str) -> TaskEntity | None:
     return None
 
 
-def create_or_get_task(session: Session, title: str, category: str, source: str) -> TaskEntity:
+def create_or_get_task(
+    session: Session,
+    title: str,
+    category: str,
+    source: str,
+    assigned_date: date,
+) -> TaskEntity:
     existing = find_existing_task(session, title)
 
     if existing:
@@ -45,6 +45,7 @@ def create_or_get_task(session: Session, title: str, category: str, source: str)
         category=category,
         status=TaskStatus.outstanding.value,
         source=source,
+        assigned_date=assigned_date,
     )
 
     session.add(task)
@@ -65,10 +66,12 @@ def mark_task_completed(session: Session, task: TaskEntity):
 
 def mark_task_outstanding(session: Session, task: TaskEntity):
     task.status = TaskStatus.outstanding.value
+    task.completed_at = None
     task.updated_at = datetime.utcnow()
 
     session.add(task)
     session.commit()
+
 
 def _to_response(entity: TaskEntity) -> TaskResponse:
     return TaskResponse(
@@ -77,10 +80,37 @@ def _to_response(entity: TaskEntity) -> TaskResponse:
         status=TaskStatus(entity.status),
         category=entity.category,
         source=entity.source,
+        assigned_date=entity.assigned_date,
         created_at=entity.created_at,
         updated_at=entity.updated_at,
         completed_at=entity.completed_at,
     )
+
+
+def create_task(session: Session, payload: DailyTaskCreate) -> TaskResponse:
+    title = payload.title.strip()
+
+    if not title:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Task title cannot be empty.",
+        )
+
+    entity = TaskEntity(
+        title=title,
+        category=payload.category,
+        status=TaskStatus.outstanding.value,
+        source=payload.source,
+        assigned_date=payload.date,
+        created_at=datetime.utcnow(),
+        updated_at=datetime.utcnow(),
+    )
+
+    session.add(entity)
+    session.commit()
+    session.refresh(entity)
+
+    return _to_response(entity)
 
 
 def list_tasks_for_day(session: Session, day: date) -> DailyTaskListResponse:
@@ -88,14 +118,11 @@ def list_tasks_for_day(session: Session, day: date) -> DailyTaskListResponse:
         select(TaskEntity).order_by(TaskEntity.created_at)
     ).all()
 
-    # For now, show all tasks that are still outstanding,
-    # plus tasks completed on the given day.
-
-    print(f"Total tasks in database: {rows}")
     outstanding = [
         _to_response(row)
         for row in rows
         if row.status == TaskStatus.outstanding.value
+        and row.assigned_date <= day
     ]
 
     completed = [
@@ -106,13 +133,12 @@ def list_tasks_for_day(session: Session, day: date) -> DailyTaskListResponse:
         and row.completed_at.date() == day
     ]
 
-    print(f"Found {len(outstanding)} outstanding and {len(completed)} completed tasks for {day.isoformat()}")
-
     return DailyTaskListResponse(
         date=day,
         outstanding=outstanding,
         completed=completed,
     )
+
 
 def update_task_status(
     session: Session,
@@ -139,3 +165,12 @@ def update_task_status(
     session.refresh(entity)
 
     return _to_response(entity)
+
+
+def mark_task_outstanding(session: Session, task: TaskEntity):
+    task.status = TaskStatus.outstanding.value
+    task.completed_at = None
+    task.updated_at = datetime.utcnow()
+
+    session.add(task)
+    session.commit()

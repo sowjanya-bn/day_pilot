@@ -57,6 +57,7 @@ def create_plan(session: Session, payload: TomorrowPlanCreate) -> TomorrowPlanRe
             title=item,
             category="general",
             source="plan",
+            assigned_date=payload.date,
         )
 
         link = PlanTaskLinkEntity(

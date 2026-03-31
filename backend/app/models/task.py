@@ -27,6 +27,7 @@ class TaskResponse(BaseModel):
     status: TaskStatus
     category: str
     source: str
+    assigned_date: date
     created_at: datetime
     updated_at: datetime
     completed_at: Optional[datetime] = None

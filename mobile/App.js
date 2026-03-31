@@ -13,17 +13,6 @@ import {
 } from "react-native";
 import * as Clipboard from "expo-clipboard";
 
-const pasteTranscriptFromClipboard = async () => {
-  try {
-    const text = await Clipboard.getStringAsync();
-    if (text) {
-      setVoiceTranscript(text);
-    }
-  } catch (err) {
-    setError("Could not paste transcript from clipboard");
-  }
-};
-
 const API_BASE_URL = "http://localhost:8000/api";
 const DEFAULT_DATE = "2026-03-30";
 
@@ -61,6 +50,12 @@ async function apiPut(path, payload) {
   return response.json();
 }
 
+function shiftDate(isoDate, days) {
+  const d = new Date(`${isoDate}T00:00:00`);
+  d.setDate(d.getDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
 export default function App() {
   const [brief, setBrief] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -90,31 +85,7 @@ export default function App() {
   const [voiceTranscript, setVoiceTranscript] = useState("");
   const [generatingDraft, setGeneratingDraft] = useState(false);
 
-  const generateCheckinDraft = async () => {
-      try {
-        setGeneratingDraft(true);
-        setError("");
-
-        const payload = {
-          date: checkinDate,
-          transcript: voiceTranscript,
-        };
-
-        const draft = await apiPost("/checkin/voice-draft", payload);
-
-        setCompletedText((draft.completed || []).join("\n"));
-        setIncompleteText((draft.incomplete || []).join("\n"));
-        setBlockersText((draft.blockers || []).join("\n"));
-        setLearnedText(draft.learned || "");
-        setSmallWinText(draft.small_win || "");
-        setMood(draft.mood || "steady");
-        setNotes(draft.notes || "");
-      } catch (err) {
-        setError(err.message || "Could not generate check-in draft");
-      } finally {
-        setGeneratingDraft(false);
-      }
-    };
+  const [newTask, setNewTask] = useState("");
 
   const loadBrief = async (day = selectedDate) => {
     try {
@@ -122,7 +93,6 @@ export default function App() {
       setError("");
 
       const response = await fetch(`${API_BASE_URL}/daily-brief/${day}`);
-
       if (!response.ok) {
         throw new Error(`Request failed: ${response.status}`);
       }
@@ -136,23 +106,103 @@ export default function App() {
     }
   };
 
-  const toggleTaskStatus = async (taskId, nextStatus) => {
-      try {
-        setError("");
-
-        await apiPut(`/tasks/${taskId}/status`, {
-          status: nextStatus,
-        });
-
-        await loadBrief(selectedDate);
-      } catch (err) {
-        setError(err.message || "Could not update task");
-      }
-    };
-
   useEffect(() => {
     loadBrief(DEFAULT_DATE);
   }, []);
+
+  useEffect(() => {
+    setPlanDate(selectedDate);
+    setCheckinDate(selectedDate);
+  }, [selectedDate]);
+
+  const pasteTranscriptFromClipboard = async () => {
+    try {
+      const text = await Clipboard.getStringAsync();
+      if (text) {
+        setVoiceTranscript(text);
+      }
+    } catch {
+      setError("Could not paste transcript from clipboard");
+    }
+  };
+
+  const handleDateChange = (newDate) => {
+    setSelectedDate(newDate);
+  };
+
+  const loadSelectedDate = async () => {
+    await loadBrief(selectedDate);
+  };
+
+  const goToPreviousDay = async () => {
+    const newDate = shiftDate(selectedDate, -1);
+    setSelectedDate(newDate);
+    await loadBrief(newDate);
+  };
+
+  const goToNextDay = async () => {
+    const newDate = shiftDate(selectedDate, 1);
+    setSelectedDate(newDate);
+    await loadBrief(newDate);
+  };
+
+  const generateCheckinDraft = async () => {
+    try {
+      setGeneratingDraft(true);
+      setError("");
+
+      const payload = {
+        date: checkinDate,
+        transcript: voiceTranscript,
+      };
+
+      const draft = await apiPost("/checkin/voice-draft", payload);
+
+      setCompletedText((draft.completed || []).join("\n"));
+      setIncompleteText((draft.incomplete || []).join("\n"));
+      setBlockersText((draft.blockers || []).join("\n"));
+      setLearnedText(draft.learned || "");
+      setSmallWinText(draft.small_win || "");
+      setMood(draft.mood || "steady");
+      setNotes(draft.notes || "");
+    } catch (err) {
+      setError(err.message || "Could not generate check-in draft");
+    } finally {
+      setGeneratingDraft(false);
+    }
+  };
+
+  const addTask = async () => {
+    try {
+      if (!newTask.trim()) return;
+
+      await apiPost("/tasks", {
+        date: selectedDate,
+        title: newTask,
+        category: "general",
+        source: "manual",
+      });
+
+      setNewTask("");
+      await loadBrief(selectedDate);
+    } catch (err) {
+      setError(err.message || "Could not add task");
+    }
+  };
+
+  const toggleTaskStatus = async (taskId, nextStatus) => {
+    try {
+      setError("");
+
+      await apiPut(`/tasks/${taskId}/status`, {
+        status: nextStatus,
+      });
+
+      await loadBrief(selectedDate);
+    } catch (err) {
+      setError(err.message || "Could not update task");
+    }
+  };
 
   const submitPlan = async () => {
     try {
@@ -225,65 +275,109 @@ export default function App() {
     }
   };
 
-
-
-
   const renderTasks = () => {
-  const { tasks } = brief || {};
+    const { tasks } = brief || {};
 
-  return (
-    <>
-      <Card title="Outstanding tasks">
-        {tasks?.outstanding?.length ? (
-          tasks.outstanding.map((task) => (
-            <View key={task.id} style={styles.taskRow}>
-              <View style={styles.taskTextBlock}>
-                <Text style={styles.taskText}>{task.title}</Text>
-                <Text style={styles.taskMeta}>
-                  {task.category} · {task.source}
-                </Text>
-              </View>
-              <Pressable
-                style={styles.taskActionButton}
-                onPress={() => toggleTaskStatus(task.id, "completed")}
-              >
-                <Text style={styles.taskActionButtonText}>Done</Text>
-              </Pressable>
-            </View>
-          ))
-        ) : (
-          <Text style={styles.muted}>No outstanding tasks</Text>
-        )}
-      </Card>
+    return (
+      <>
+        <Card title="Date">
+          <TextInput
+            value={selectedDate}
+            onChangeText={handleDateChange}
+            onSubmitEditing={loadSelectedDate}
+            style={styles.input}
+            placeholder="YYYY-MM-DD"
+          />
 
-      <Card title="Completed today">
-        {tasks?.completed?.length ? (
-          tasks.completed.map((task) => (
-            <View key={task.id} style={styles.taskRow}>
-              <View style={styles.taskTextBlock}>
-                <Text style={styles.completedTaskText}>{task.title}</Text>
-                <Text style={styles.taskMeta}>
-                  {task.category} · {task.source}
-                </Text>
+          <View style={styles.dateControls}>
+            <Pressable style={styles.dateChip} onPress={goToPreviousDay}>
+              <Text style={styles.dateChipText}>← Previous</Text>
+            </Pressable>
+
+            <Pressable
+              style={styles.dateChip}
+              onPress={() => {
+                setSelectedDate(new Date().toISOString().slice(0, 10));
+                loadBrief(new Date().toISOString().slice(0, 10));
+              }}
+            >
+              <Text style={styles.dateChipText}>Today</Text>
+            </Pressable>
+
+            <Pressable style={styles.dateChip} onPress={goToNextDay}>
+              <Text style={styles.dateChipText}>Next →</Text>
+            </Pressable>
+          </View>
+
+          <Pressable style={styles.secondaryButton} onPress={loadSelectedDate}>
+            <Text style={styles.secondaryButtonText}>Load date</Text>
+          </Pressable>
+        </Card>
+
+        <Card title="Add task">
+          <TextInput
+            value={newTask}
+            onChangeText={setNewTask}
+            placeholder="What needs to be done?"
+            style={styles.input}
+          />
+
+          <Pressable style={styles.primaryButton} onPress={addTask}>
+            <Text style={styles.primaryButtonText}>Add</Text>
+          </Pressable>
+        </Card>
+
+        <Card title="Outstanding tasks">
+          {tasks?.outstanding?.length ? (
+            tasks.outstanding.map((task) => (
+              <View key={task.id} style={styles.taskRow}>
+                <View style={styles.taskTextBlock}>
+                  <Text style={styles.taskText}>{task.title}</Text>
+                  <Text style={styles.taskMeta}>
+                    {task.category} · {task.source}
+                  </Text>
+                </View>
+                <Pressable
+                  style={styles.taskActionButton}
+                  onPress={() => toggleTaskStatus(task.id, "completed")}
+                >
+                  <Text style={styles.taskActionButtonText}>Done</Text>
+                </Pressable>
               </View>
-              <Pressable
-                style={styles.taskUndoButton}
-                onPress={() => toggleTaskStatus(task.id, "outstanding")}
-              >
-                <Text style={styles.taskUndoButtonText}>Undo</Text>
-              </Pressable>
-            </View>
-          ))
-        ) : (
-          <Text style={styles.muted}>No completed tasks today</Text>
-        )}
-      </Card>
-    </>
-  );
-};
+            ))
+          ) : (
+            <Text style={styles.muted}>No outstanding tasks</Text>
+          )}
+        </Card>
+
+        <Card title="Completed today">
+          {tasks?.completed?.length ? (
+            tasks.completed.map((task) => (
+              <View key={task.id} style={styles.taskRow}>
+                <View style={styles.taskTextBlock}>
+                  <Text style={styles.completedTaskText}>{task.title}</Text>
+                  <Text style={styles.taskMeta}>
+                    {task.category} · {task.source}
+                  </Text>
+                </View>
+                <Pressable
+                  style={styles.taskUndoButton}
+                  onPress={() => toggleTaskStatus(task.id, "outstanding")}
+                >
+                  <Text style={styles.taskUndoButtonText}>Undo</Text>
+                </Pressable>
+              </View>
+            ))
+          ) : (
+            <Text style={styles.muted}>No completed tasks today</Text>
+          )}
+        </Card>
+      </>
+    );
+  };
 
   const renderBrief = () => {
-    const { guidance, stats, plan, yesterday_reflection, tasks } = brief || {};
+    const { guidance, stats, plan, yesterday_reflection } = brief || {};
 
     return (
       <>
@@ -399,42 +493,6 @@ export default function App() {
           <Text style={styles.label}>Notes</Text>
           <Text style={styles.value}>{yesterday_reflection?.notes || "—"}</Text>
         </Card>
-
-        <Card title="Outstanding tasks">
-          {tasks?.outstanding?.length ? (
-            tasks.outstanding.map((task) => (
-              <View key={task.id} style={styles.taskRow}>
-                <Text style={styles.taskText}>{task.title}</Text>
-                <Pressable
-                  style={styles.taskActionButton}
-                  onPress={() => toggleTaskStatus(task.id, "completed")}
-                >
-                  <Text style={styles.taskActionButtonText}>Done</Text>
-                </Pressable>
-              </View>
-            ))
-          ) : (
-            <Text style={styles.muted}>No outstanding tasks</Text>
-          )}
-        </Card>
-
-        <Card title="Completed tasks">
-          {tasks?.completed?.length ? (
-            tasks.completed.map((task) => (
-              <View key={task.id} style={styles.taskRow}>
-                <Text style={styles.completedTaskText}>{task.title}</Text>
-                <Pressable
-                  style={styles.taskUndoButton}
-                  onPress={() => toggleTaskStatus(task.id, "outstanding")}
-                >
-                  <Text style={styles.taskUndoButtonText}>Undo</Text>
-                </Pressable>
-              </View>
-            ))
-          ) : (
-            <Text style={styles.muted}>No completed tasks yet</Text>
-          )}
-        </Card>
       </>
     );
   };
@@ -531,35 +589,34 @@ export default function App() {
         </Text>
       </Pressable>
 
-
       <FormField label="Voice transcript / rant">
-          <TextInput
-              value={voiceTranscript}
-              onChangeText={setVoiceTranscript}
-              style={[styles.input, styles.largeTextArea]}
-              placeholder="Paste or dictate your rant here..."
-              multiline
-              autoCorrect
-              autoCapitalize="sentences"
-            />
-        </FormField>
+        <TextInput
+          value={voiceTranscript}
+          onChangeText={setVoiceTranscript}
+          style={[styles.input, styles.largeTextArea]}
+          placeholder="Paste or dictate your rant here..."
+          multiline
+          autoCorrect
+          autoCapitalize="sentences"
+        />
+      </FormField>
 
-        <Pressable
-          style={styles.secondaryButton}
-          onPress={pasteTranscriptFromClipboard}
-        >
-          <Text style={styles.secondaryButtonText}>Paste from clipboard</Text>
-        </Pressable>
+      <Pressable
+        style={styles.secondaryButton}
+        onPress={pasteTranscriptFromClipboard}
+      >
+        <Text style={styles.secondaryButtonText}>Paste from clipboard</Text>
+      </Pressable>
 
-        <Pressable
-          style={styles.secondaryButton}
-          onPress={generateCheckinDraft}
-          disabled={generatingDraft || !voiceTranscript.trim()}
-        >
-          <Text style={styles.secondaryButtonText}>
-            {generatingDraft ? "Generating draft..." : "Generate draft from transcript"}
-          </Text>
-        </Pressable>
+      <Pressable
+        style={styles.secondaryButton}
+        onPress={generateCheckinDraft}
+        disabled={generatingDraft || !voiceTranscript.trim()}
+      >
+        <Text style={styles.secondaryButtonText}>
+          {generatingDraft ? "Generating draft..." : "Generate draft from transcript"}
+        </Text>
+      </Pressable>
 
       <FormField label="Date">
         <TextInput
@@ -852,10 +909,14 @@ const styles = StyleSheet.create({
     minHeight: 64,
     textAlignVertical: "top",
   },
+  largeTextArea: {
+    minHeight: 120,
+    textAlignVertical: "top",
+  },
   primaryButton: {
-    marginTop: 8,
+    marginTop: 10,
     backgroundColor: "#111",
-    paddingVertical: 14,
+    paddingVertical: 12,
     borderRadius: 12,
     alignItems: "center",
   },
@@ -865,7 +926,7 @@ const styles = StyleSheet.create({
     fontSize: 15,
   },
   secondaryButton: {
-    marginTop: 4,
+    marginTop: 8,
     backgroundColor: "#e9e9ee",
     paddingVertical: 14,
     borderRadius: 12,
@@ -891,60 +952,74 @@ const styles = StyleSheet.create({
     fontSize: 14,
     marginBottom: 4,
   },
-  largeTextArea: {
-    minHeight: 120,
-    textAlignVertical: "top",
-  },
   taskRow: {
-  flexDirection: "row",
-  alignItems: "center",
-  justifyContent: "space-between",
-  gap: 12,
-  paddingVertical: 8,
-  borderBottomWidth: 1,
-  borderBottomColor: "#f0f0f0",
-},
-taskText: {
-  flex: 1,
-  fontSize: 15,
-  lineHeight: 22,
-  color: "#222",
-},
-completedTaskText: {
-  flex: 1,
-  fontSize: 15,
-  lineHeight: 22,
-  color: "#777",
-  textDecorationLine: "line-through",
-},
-taskActionButton: {
-  backgroundColor: "#111",
-  paddingHorizontal: 12,
-  paddingVertical: 8,
-  borderRadius: 10,
-},
-taskActionButtonText: {
-  color: "#fff",
-  fontWeight: "700",
-  fontSize: 13,
-},
-taskUndoButton: {
-  backgroundColor: "#e9e9ee",
-  paddingHorizontal: 12,
-  paddingVertical: 8,
-  borderRadius: 10,
-},
-taskUndoButtonText: {
-  color: "#111",
-  fontWeight: "700",
-  fontSize: 13,
-},
-taskTextBlock: {
-  flex: 1,
-},
-taskMeta: {
-  fontSize: 12,
-  color: "#777",
-  marginTop: 2,
-},
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: "#f0f0f0",
+  },
+  taskText: {
+    flex: 1,
+    fontSize: 15,
+    lineHeight: 22,
+    color: "#222",
+  },
+  completedTaskText: {
+    flex: 1,
+    fontSize: 15,
+    lineHeight: 22,
+    color: "#777",
+    textDecorationLine: "line-through",
+  },
+  taskActionButton: {
+    backgroundColor: "#111",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 10,
+  },
+  taskActionButtonText: {
+    color: "#fff",
+    fontWeight: "700",
+    fontSize: 13,
+  },
+  taskUndoButton: {
+    backgroundColor: "#e9e9ee",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 10,
+  },
+  taskUndoButtonText: {
+    color: "#111",
+    fontWeight: "700",
+    fontSize: 13,
+  },
+  taskTextBlock: {
+    flex: 1,
+  },
+  taskMeta: {
+    fontSize: 12,
+    color: "#777",
+    marginTop: 2,
+  },
+  dateControls: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    gap: 8,
+    marginTop: 10,
+  },
+  dateChip: {
+    flex: 1,
+    backgroundColor: "#e9e9ee",
+    paddingVertical: 10,
+    borderRadius: 10,
+    alignItems: "center",
+  },
+  dateChipText: {
+    color: "#111",
+    fontWeight: "600",
+    fontSize: 13,
+  },
 });

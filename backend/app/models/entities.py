@@ -3,15 +3,15 @@ from typing import Optional
 
 from sqlmodel import Field, SQLModel
 
-
 class TaskEntity(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
 
     title: str
     category: str = Field(default="general", index=True)
     status: str = Field(default="outstanding", index=True)
-
     source: str = Field(default="manual")
+
+    assigned_date: dt_date = Field(index=True)
 
     created_at: dt_datetime = Field(default_factory=dt_datetime.utcnow)
     updated_at: dt_datetime = Field(default_factory=dt_datetime.utcnow)
