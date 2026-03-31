@@ -11,6 +11,18 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from "react-native";
+import * as Clipboard from "expo-clipboard";
+
+const pasteTranscriptFromClipboard = async () => {
+  try {
+    const text = await Clipboard.getStringAsync();
+    if (text) {
+      setVoiceTranscript(text);
+    }
+  } catch (err) {
+    setError("Could not paste transcript from clipboard");
+  }
+};
 
 const API_BASE_URL = "http://localhost:8000/api";
 const DEFAULT_DATE = "2026-03-30";
@@ -57,6 +69,35 @@ export default function App() {
   const [mood, setMood] = useState("steady");
   const [notes, setNotes] = useState("");
   const [submittingCheckin, setSubmittingCheckin] = useState(false);
+
+  const [voiceTranscript, setVoiceTranscript] = useState("");
+  const [generatingDraft, setGeneratingDraft] = useState(false);
+
+  const generateCheckinDraft = async () => {
+      try {
+        setGeneratingDraft(true);
+        setError("");
+
+        const payload = {
+          date: checkinDate,
+          transcript: voiceTranscript,
+        };
+
+        const draft = await apiPost("/checkin/voice-draft", payload);
+
+        setCompletedText((draft.completed || []).join("\n"));
+        setIncompleteText((draft.incomplete || []).join("\n"));
+        setBlockersText((draft.blockers || []).join("\n"));
+        setLearnedText(draft.learned || "");
+        setSmallWinText(draft.small_win || "");
+        setMood(draft.mood || "steady");
+        setNotes(draft.notes || "");
+      } catch (err) {
+        setError(err.message || "Could not generate check-in draft");
+      } finally {
+        setGeneratingDraft(false);
+      }
+    };
 
   const loadBrief = async (day = selectedDate) => {
     try {
@@ -365,6 +406,36 @@ export default function App() {
           {submittingCheckin ? "Saving..." : "Save check-in"}
         </Text>
       </Pressable>
+
+
+      <FormField label="Voice transcript / rant">
+          <TextInput
+              value={voiceTranscript}
+              onChangeText={setVoiceTranscript}
+              style={[styles.input, styles.largeTextArea]}
+              placeholder="Paste or dictate your rant here..."
+              multiline
+              autoCorrect
+              autoCapitalize="sentences"
+            />
+        </FormField>
+
+        <Pressable
+          style={styles.secondaryButton}
+          onPress={pasteTranscriptFromClipboard}
+        >
+          <Text style={styles.secondaryButtonText}>Paste from clipboard</Text>
+        </Pressable>
+
+        <Pressable
+          style={styles.secondaryButton}
+          onPress={generateCheckinDraft}
+          disabled={generatingDraft || !voiceTranscript.trim()}
+        >
+          <Text style={styles.secondaryButtonText}>
+            {generatingDraft ? "Generating draft..." : "Generate draft from transcript"}
+          </Text>
+        </Pressable>
 
       <FormField label="Date">
         <TextInput
@@ -689,5 +760,9 @@ const styles = StyleSheet.create({
     color: "#b00020",
     fontSize: 14,
     marginBottom: 4,
+  },
+  largeTextArea: {
+    minHeight: 120,
+    textAlignVertical: "top",
   },
 });
