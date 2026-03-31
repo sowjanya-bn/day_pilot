@@ -7,6 +7,7 @@ from app.models.brief import DailyBriefResponse
 from app.services import checkin_service, planner_service
 from app.services.guidance_service import get_carry_forward
 from app.services.stats_service import get_daily_stats
+from app.services.task_service import list_tasks_for_day
 
 
 def get_daily_brief(session: Session, day: date) -> DailyBriefResponse:
@@ -28,6 +29,7 @@ def get_daily_brief(session: Session, day: date) -> DailyBriefResponse:
 
     guidance = get_carry_forward(session, day)
     stats = get_daily_stats(session, day)
+    tasks = list_tasks_for_day(session, day)
 
     return DailyBriefResponse(
         date=day,
@@ -35,4 +37,5 @@ def get_daily_brief(session: Session, day: date) -> DailyBriefResponse:
         yesterday_reflection=yesterday,
         guidance=guidance,
         stats=stats,
+        tasks=tasks,
     )

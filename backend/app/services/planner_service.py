@@ -4,6 +4,9 @@ from datetime import date, datetime
 from fastapi import HTTPException, status
 from sqlmodel import Session, select
 
+from app.services.task_service import create_or_get_task
+from app.models.entities import PlanTaskLinkEntity
+
 from app.models.entities import TomorrowPlanEntity
 from app.models.planner import (
     TomorrowPlanCreate,
@@ -43,7 +46,26 @@ def create_plan(session: Session, payload: TomorrowPlanCreate) -> TomorrowPlanRe
         job_goal=payload.job_goal,
         social_goal=payload.social_goal,
     )
+
+
     session.add(entity)
+
+    # create tasks from top priorities
+    for item in payload.top_priorities:
+        task = create_or_get_task(
+            session,
+            title=item,
+            category="general",
+            source="plan",
+        )
+
+        link = PlanTaskLinkEntity(
+            plan_id=entity.id,
+            task_id=task.id,
+            role="priority",
+        )
+
+        session.add(link)
     session.commit()
     session.refresh(entity)
     return _to_response(entity)

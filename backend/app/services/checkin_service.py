@@ -7,6 +7,9 @@ from sqlmodel import Session, select
 from app.models.checkin import DailyCheckinCreate, DailyCheckinResponse
 from app.models.entities import DailyCheckinEntity
 
+from app.services.task_service import create_or_get_task, mark_task_completed
+from app.models.entities import CheckinTaskLinkEntity
+
 
 def _to_response(entity: DailyCheckinEntity) -> DailyCheckinResponse:
     return DailyCheckinResponse(
@@ -46,6 +49,42 @@ def create_checkin(session: Session, payload: DailyCheckinCreate) -> DailyChecki
         notes=payload.notes,
     )
     session.add(entity)
+
+    for item in payload.completed:
+        task = create_or_get_task(
+            session,
+            title=item,
+            category="general",
+            source="checkin",
+        )
+
+        mark_task_completed(session, task)
+
+        link = CheckinTaskLinkEntity(
+            checkin_id=entity.id,
+            task_id=task.id,
+            update_type="completed",
+        )
+
+        session.add(link)
+
+    for item in payload.incomplete:
+        task = create_or_get_task(
+            session,
+            title=item,
+            category="general",
+            source="checkin",
+        )
+
+        link = CheckinTaskLinkEntity(
+            checkin_id=entity.id,
+            task_id=task.id,
+            update_type="incomplete",
+        )
+
+        session.add(link)
+
+
     session.commit()
     session.refresh(entity)
     return _to_response(entity)

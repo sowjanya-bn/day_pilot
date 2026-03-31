@@ -7,6 +7,7 @@ from app.models.checkin import DailyCheckinResponse
 from app.models.guidance import CarryForwardResponse
 from app.models.planner import TomorrowPlanResponse
 from app.models.stats import DailyStatsResponse
+from app.models.task import DailyTaskListResponse
 
 
 class DailyBriefResponse(BaseModel):
@@ -15,3 +16,4 @@ class DailyBriefResponse(BaseModel):
     yesterday_reflection: Optional[DailyCheckinResponse] = None
     guidance: CarryForwardResponse
     stats: DailyStatsResponse
+    tasks: DailyTaskListResponse

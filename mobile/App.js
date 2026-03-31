@@ -44,6 +44,23 @@ async function apiPost(path, payload) {
   return response.json();
 }
 
+async function apiPut(path, payload) {
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(text || `Request failed: ${response.status}`);
+  }
+
+  return response.json();
+}
+
 export default function App() {
   const [brief, setBrief] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -118,6 +135,20 @@ export default function App() {
       setLoading(false);
     }
   };
+
+  const toggleTaskStatus = async (taskId, nextStatus) => {
+      try {
+        setError("");
+
+        await apiPut(`/tasks/${taskId}/status`, {
+          status: nextStatus,
+        });
+
+        await loadBrief(selectedDate);
+      } catch (err) {
+        setError(err.message || "Could not update task");
+      }
+    };
 
   useEffect(() => {
     loadBrief(DEFAULT_DATE);
@@ -194,8 +225,65 @@ export default function App() {
     }
   };
 
+
+
+
+  const renderTasks = () => {
+  const { tasks } = brief || {};
+
+  return (
+    <>
+      <Card title="Outstanding tasks">
+        {tasks?.outstanding?.length ? (
+          tasks.outstanding.map((task) => (
+            <View key={task.id} style={styles.taskRow}>
+              <View style={styles.taskTextBlock}>
+                <Text style={styles.taskText}>{task.title}</Text>
+                <Text style={styles.taskMeta}>
+                  {task.category} · {task.source}
+                </Text>
+              </View>
+              <Pressable
+                style={styles.taskActionButton}
+                onPress={() => toggleTaskStatus(task.id, "completed")}
+              >
+                <Text style={styles.taskActionButtonText}>Done</Text>
+              </Pressable>
+            </View>
+          ))
+        ) : (
+          <Text style={styles.muted}>No outstanding tasks</Text>
+        )}
+      </Card>
+
+      <Card title="Completed today">
+        {tasks?.completed?.length ? (
+          tasks.completed.map((task) => (
+            <View key={task.id} style={styles.taskRow}>
+              <View style={styles.taskTextBlock}>
+                <Text style={styles.completedTaskText}>{task.title}</Text>
+                <Text style={styles.taskMeta}>
+                  {task.category} · {task.source}
+                </Text>
+              </View>
+              <Pressable
+                style={styles.taskUndoButton}
+                onPress={() => toggleTaskStatus(task.id, "outstanding")}
+              >
+                <Text style={styles.taskUndoButtonText}>Undo</Text>
+              </Pressable>
+            </View>
+          ))
+        ) : (
+          <Text style={styles.muted}>No completed tasks today</Text>
+        )}
+      </Card>
+    </>
+  );
+};
+
   const renderBrief = () => {
-    const { guidance, stats, plan, yesterday_reflection } = brief || {};
+    const { guidance, stats, plan, yesterday_reflection, tasks } = brief || {};
 
     return (
       <>
@@ -310,6 +398,42 @@ export default function App() {
 
           <Text style={styles.label}>Notes</Text>
           <Text style={styles.value}>{yesterday_reflection?.notes || "—"}</Text>
+        </Card>
+
+        <Card title="Outstanding tasks">
+          {tasks?.outstanding?.length ? (
+            tasks.outstanding.map((task) => (
+              <View key={task.id} style={styles.taskRow}>
+                <Text style={styles.taskText}>{task.title}</Text>
+                <Pressable
+                  style={styles.taskActionButton}
+                  onPress={() => toggleTaskStatus(task.id, "completed")}
+                >
+                  <Text style={styles.taskActionButtonText}>Done</Text>
+                </Pressable>
+              </View>
+            ))
+          ) : (
+            <Text style={styles.muted}>No outstanding tasks</Text>
+          )}
+        </Card>
+
+        <Card title="Completed tasks">
+          {tasks?.completed?.length ? (
+            tasks.completed.map((task) => (
+              <View key={task.id} style={styles.taskRow}>
+                <Text style={styles.completedTaskText}>{task.title}</Text>
+                <Pressable
+                  style={styles.taskUndoButton}
+                  onPress={() => toggleTaskStatus(task.id, "outstanding")}
+                >
+                  <Text style={styles.taskUndoButtonText}>Undo</Text>
+                </Pressable>
+              </View>
+            ))
+          ) : (
+            <Text style={styles.muted}>No completed tasks yet</Text>
+          )}
         </Card>
       </>
     );
@@ -569,6 +693,11 @@ export default function App() {
               active={screen === "checkin"}
               onPress={() => setScreen("checkin")}
             />
+            <NavButton
+              label="Tasks"
+              active={screen === "tasks"}
+              onPress={() => setScreen("tasks")}
+            />
           </View>
 
           {error ? <Text style={styles.inlineError}>{error}</Text> : null}
@@ -576,6 +705,7 @@ export default function App() {
           {screen === "brief" && renderBrief()}
           {screen === "plan" && renderPlanForm()}
           {screen === "checkin" && renderCheckinForm()}
+          {screen === "tasks" && renderTasks()}
 
           <Pressable
             style={styles.secondaryButton}
@@ -765,4 +895,56 @@ const styles = StyleSheet.create({
     minHeight: 120,
     textAlignVertical: "top",
   },
+  taskRow: {
+  flexDirection: "row",
+  alignItems: "center",
+  justifyContent: "space-between",
+  gap: 12,
+  paddingVertical: 8,
+  borderBottomWidth: 1,
+  borderBottomColor: "#f0f0f0",
+},
+taskText: {
+  flex: 1,
+  fontSize: 15,
+  lineHeight: 22,
+  color: "#222",
+},
+completedTaskText: {
+  flex: 1,
+  fontSize: 15,
+  lineHeight: 22,
+  color: "#777",
+  textDecorationLine: "line-through",
+},
+taskActionButton: {
+  backgroundColor: "#111",
+  paddingHorizontal: 12,
+  paddingVertical: 8,
+  borderRadius: 10,
+},
+taskActionButtonText: {
+  color: "#fff",
+  fontWeight: "700",
+  fontSize: 13,
+},
+taskUndoButton: {
+  backgroundColor: "#e9e9ee",
+  paddingHorizontal: 12,
+  paddingVertical: 8,
+  borderRadius: 10,
+},
+taskUndoButtonText: {
+  color: "#111",
+  fontWeight: "700",
+  fontSize: 13,
+},
+taskTextBlock: {
+  flex: 1,
+},
+taskMeta: {
+  fontSize: 12,
+  color: "#777",
+  marginTop: 2,
+},
 });
