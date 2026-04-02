@@ -4,10 +4,13 @@ from typing import Optional
 
 from pydantic import BaseModel
 
+from sqlmodel import Field, SQLModel
+
 
 class TaskStatus(str, Enum):
-    outstanding = "outstanding"
-    completed = "completed"
+    PLANNED = "planned"
+    COMPLETED = "completed"
+    CANCELLED = "cancelled"
 
 
 class DailyTaskCreate(BaseModel):
@@ -37,3 +40,20 @@ class DailyTaskListResponse(BaseModel):
     date: date
     outstanding: list[TaskResponse]
     completed: list[TaskResponse]
+
+
+class Task(SQLModel, table=False):
+    """Example task model.
+
+    Replace this with your real SQLModel entity import in your app.
+    """
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    title: str
+    status: TaskStatus = Field(default=TaskStatus.PLANNED)
+    assigned_date: date
+    completed_at: Optional[datetime] = None
+    category: Optional[str] = None
+    priority: Optional[str] = None
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
