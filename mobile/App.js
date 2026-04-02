@@ -493,6 +493,34 @@ export default function App() {
           <Text style={styles.label}>Notes</Text>
           <Text style={styles.value}>{yesterday_reflection?.notes || "—"}</Text>
         </Card>
+        {brief?.reflection && (
+  <Card title="Reflection">
+    {brief.reflection.patterns?.length > 0 && (
+      <>
+        <Text style={styles.label}>What stood out</Text>
+        {brief.reflection.patterns.map((p, i) => (
+          <Text key={i} style={styles.listItem}>• {p}</Text>
+        ))}
+      </>
+    )}
+
+    {brief.reflection.insight && (
+      <>
+        <Text style={styles.label}>What this may mean</Text>
+        <Text style={styles.value}>{brief.reflection.insight}</Text>
+      </>
+    )}
+
+    {brief.reflection.next_steps?.length > 0 && (
+      <>
+        <Text style={styles.label}>Suggested next step</Text>
+        {brief.reflection.next_steps.map((g, i) => (
+          <Text key={i} style={styles.listItem}>• {g}</Text>
+        ))}
+      </>
+    )}
+  </Card>
+)}
       </>
     );
   };

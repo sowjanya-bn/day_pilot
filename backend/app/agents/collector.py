@@ -5,8 +5,9 @@ from datetime import date, timedelta
 
 from sqlmodel import Session, select
 
-from agents.schemas import DailyContext, RollingStats
-from app.models.task import Task, TaskStatus
+from app.agents.schemas import DailyContext, RollingStats
+from app.models.task import TaskStatus
+from app.models.entities import TaskEntity
 
 
 class ContextCollector:
@@ -17,10 +18,10 @@ class ContextCollector:
         window_start = target_date - timedelta(days=6)
 
         recent_tasks = session.exec(
-            select(Task).where(Task.assigned_date >= window_start, Task.assigned_date <= target_date)
+            select(TaskEntity).where(TaskEntity.assigned_date >= window_start, TaskEntity.assigned_date <= target_date)
         ).all()
 
-        open_tasks = session.exec(select(Task).where(Task.status == TaskStatus.PLANNED)).all()
+        open_tasks = session.exec(select(TaskEntity).where(TaskEntity.status == TaskStatus.PLANNED)).all()
 
         today_task_ids = [task.id for task in recent_tasks if task.assigned_date == target_date and task.id is not None]
         open_task_ids = [task.id for task in open_tasks if task.id is not None]

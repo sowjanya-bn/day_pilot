@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from agents.detectors.base import PatternDetector
-from agents.schemas import DailyContext, PatternFinding
+from app.agents.detectors.base import PatternDetector
+from app.agents.schemas import DailyContext, PatternFinding
 
 
 class ImbalanceDetector(PatternDetector):

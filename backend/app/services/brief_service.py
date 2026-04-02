@@ -8,7 +8,27 @@ from app.services import checkin_service, planner_service
 from app.services.guidance_service import get_carry_forward
 from app.services.stats_service import get_daily_stats
 from app.services.task_service import list_tasks_for_day
+from app.agents.service import AgentService
 
+def map_agent_to_brief(agent_report):
+    if not agent_report:
+        return None
+
+    insight = None
+    if agent_report.insights:
+        insight = agent_report.insights[0].message
+
+    guidance = [g.message for g in agent_report.guidance[:2]]
+    patterns = [f.summary for f in agent_report.findings[:2]]
+
+    if not insight and not guidance and not patterns:
+        return None
+
+    return {
+        "insight": insight,
+        "guidance": guidance,
+        "patterns": patterns,
+    }
 
 def get_daily_brief(session: Session, day: date) -> DailyBriefResponse:
     try:
@@ -30,6 +50,16 @@ def get_daily_brief(session: Session, day: date) -> DailyBriefResponse:
     guidance = get_carry_forward(session, day)
     stats = get_daily_stats(session, day)
     tasks = list_tasks_for_day(session, day)
+    agent_service = AgentService()
+    agent_report = agent_service.generate_daily_report(session, day)
+    reflection = None
+
+    if agent_report:
+        reflection = {
+            "insight": agent_report.insights[0].message if agent_report.insights else None,
+            "patterns": [f.summary for f in agent_report.findings[:2]],
+            "next_steps": [g.message for g in agent_report.guidance[:2]],
+        }
 
     return DailyBriefResponse(
         date=day,
@@ -38,4 +68,5 @@ def get_daily_brief(session: Session, day: date) -> DailyBriefResponse:
         guidance=guidance,
         stats=stats,
         tasks=tasks,
+        reflection=reflection,
     )

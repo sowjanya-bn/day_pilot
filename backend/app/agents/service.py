@@ -4,14 +4,14 @@ from datetime import date
 
 from sqlmodel import Session
 
-from agents.collector import ContextCollector
-from agents.detectors.backlog import BacklogDetector
-from agents.detectors.carry_forward import CarryForwardDetector
-from agents.detectors.imbalance import ImbalanceDetector
-from agents.detectors.overcommitment import OvercommitmentDetector
-from agents.guidance import GuidanceEngine
-from agents.schemas import AgentReport
-from agents.synthesizer import InsightSynthesizer
+from app.agents.collector import ContextCollector
+from app.agents.detectors.backlog import BacklogDetector
+from app.agents.detectors.carry_forward import CarryForwardDetector
+from app.agents.detectors.imbalance import ImbalanceDetector
+from app.agents.detectors.overcommitment import OvercommitmentDetector
+from app.agents.guidance import GuidanceEngine
+from app.agents.schemas import AgentReport
+from app.agents.synthesizer import InsightSynthesizer
 
 
 class AgentService:

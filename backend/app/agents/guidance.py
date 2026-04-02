@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from agents.schemas import DailyContext, GuidanceItem, Insight, PatternFinding
+from app.agents.schemas import DailyContext, GuidanceItem, Insight, PatternFinding
 
 
 class GuidanceEngine:

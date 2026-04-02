@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 
-from agents.schemas import DailyContext, PatternFinding
+from app.agents.schemas import DailyContext, PatternFinding
 
 
 class PatternDetector(ABC):

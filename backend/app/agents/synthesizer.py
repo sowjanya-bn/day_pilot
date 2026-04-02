@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from agents.schemas import DailyContext, Insight, PatternFinding
+from app.agents.schemas import DailyContext, Insight, PatternFinding
 
 
 class InsightSynthesizer:
