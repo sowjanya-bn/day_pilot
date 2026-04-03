@@ -25,6 +25,17 @@ class InsightSynthesizer:
                 )
             )
 
+        elif "overcommitment" in finding_types:
+            insights.append(
+                Insight(
+                    type="planning_load",
+                    priority="medium",
+                    confidence=finding_types["overcommitment"].confidence,
+                    message="You may be taking on more than you can comfortably complete right now.",
+                    supporting_patterns=["overcommitment"],
+                )
+            )
+
         elif "backlog" in finding_types:
             insights.append(
                 Insight(

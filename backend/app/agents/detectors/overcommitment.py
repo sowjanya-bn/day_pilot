@@ -19,17 +19,15 @@ class OvercommitmentDetector(PatternDetector):
         return [
             PatternFinding(
                 type="overcommitment",
-                severity="medium" if stats.completion_ratio > 0.3 else "high",
-                confidence=min(0.65 + (1 - stats.completion_ratio) * 0.3, 0.95),
+                severity="high" if stats.completion_ratio < 0.5 else "medium",
+                confidence=min(0.7 + (0.5 - stats.completion_ratio), 0.95),
                 summary=(
-                    f"7-day completion ratio is {stats.completion_ratio:.0%}, "
-                    "which suggests planning load may be too high"
+                    f"You’ve been completing fewer tasks than you planned over the past few days (≈ {stats.completion_ratio:.0%})"
                 ),
                 evidence={
                     "planned_count": stats.planned_count,
                     "completed_count": stats.completed_count,
                     "completion_ratio": stats.completion_ratio,
-                    "threshold": self.completion_ratio_threshold,
                 },
             )
         ]

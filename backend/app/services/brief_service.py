@@ -24,11 +24,21 @@ def map_agent_to_brief(agent_report):
     if not insight and not guidance and not patterns:
         return None
 
-    return {
+    if insight and insight in patterns:
+        insight = None
+
+    reflection = {
         "insight": insight,
         "guidance": guidance,
         "patterns": patterns,
     }
+
+    print("Mapped Reflection:", reflection)
+
+    if not reflection["insight"] and not reflection["patterns"] and not reflection["guidance"]:
+        reflection = None
+
+    return reflection
 
 def get_daily_brief(session: Session, day: date) -> DailyBriefResponse:
     try:
@@ -52,14 +62,13 @@ def get_daily_brief(session: Session, day: date) -> DailyBriefResponse:
     tasks = list_tasks_for_day(session, day)
     agent_service = AgentService()
     agent_report = agent_service.generate_daily_report(session, day)
-    reflection = None
+    reflection = map_agent_to_brief(agent_report)
+    print("Agent Report:", agent_report)
+    print("Reflection:", reflection)
 
-    if agent_report:
-        reflection = {
-            "insight": agent_report.insights[0].message if agent_report.insights else None,
-            "patterns": [f.summary for f in agent_report.findings[:2]],
-            "next_steps": [g.message for g in agent_report.guidance[:2]],
-        }
+    print("FINDINGS:", [(f.type, f.summary, f.severity, f.confidence) for f in agent_report.findings])
+    print("INSIGHTS:", [(i.type, i.message, i.confidence) for i in agent_report.insights])
+    print("GUIDANCE:", [(g.type, g.message) for g in agent_report.guidance])
 
     return DailyBriefResponse(
         date=day,

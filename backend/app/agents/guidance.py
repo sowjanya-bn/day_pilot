@@ -12,6 +12,7 @@ class GuidanceEngine:
     ) -> list[GuidanceItem]:
         guidance: list[GuidanceItem] = []
         finding_types = {finding.type for finding in findings}
+        insight_types = {insight.type for insight in insights}
 
         if "carry_forward" in finding_types:
             guidance.append(
@@ -24,7 +25,9 @@ class GuidanceEngine:
                 )
             )
 
-        if "overcommitment" in finding_types or "backlog" in finding_types:
+        if "carry_forward" in finding_types and (
+            "overcommitment" in finding_types or "planning_load" in insight_types
+        ):
             guidance.append(
                 GuidanceItem(
                     type="planning_adjustment",
@@ -36,6 +39,28 @@ class GuidanceEngine:
                 )
             )
 
+        elif "overcommitment" in finding_types or "planning_load" in insight_types:
+            guidance.append(
+                GuidanceItem(
+                    type="reduce_load",
+                    priority="medium",
+                    title="Reduce tomorrow's load",
+                    message="Try planning fewer tasks tomorrow to match your current pace.",
+                    action="reduce_plan_size",
+                )
+            )
+
+        elif "backlog" in finding_types:
+            guidance.append(
+                GuidanceItem(
+                    type="backlog_cleanup",
+                    priority="medium",
+                    title="Clear one older task",
+                    message="Finish or intentionally drop one older open task before adding more work.",
+                    action="clear_old_task",
+                )
+            )
+
         if "imbalance" in finding_types:
             guidance.append(
                 GuidanceItem(
@@ -44,16 +69,6 @@ class GuidanceEngine:
                     title="Add one neglected area",
                     message="Include one task from a less-active category in tomorrow's plan to keep the week balanced.",
                     action="add_category_slot",
-                )
-            )
-
-        if not guidance:
-            guidance.append(
-                GuidanceItem(
-                    type="maintain_momentum",
-                    priority="low",
-                    title="Keep the plan steady",
-                    message="Your current task flow looks manageable. Keep tomorrow's plan small and focused.",
                 )
             )
 

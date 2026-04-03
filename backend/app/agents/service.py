@@ -28,6 +28,8 @@ class AgentService:
 
     def generate_daily_report(self, session: Session, target_date: date) -> AgentReport:
         context = self.collector.collect(session, target_date)
+        print("CONTEXT:", context.model_dump())
+        context = self.collector.collect(session, target_date)
 
         findings = []
         for detector in self.detectors:
