@@ -121,14 +121,14 @@ def list_tasks_for_day(session: Session, day: date) -> DailyTaskListResponse:
     outstanding = [
         _to_response(row)
         for row in rows
-        if row.status == TaskStatus.outstanding.value
+        if row.status == TaskStatus.PLANNED.value
         and row.assigned_date <= day
     ]
 
     completed = [
         _to_response(row)
         for row in rows
-        if row.status == TaskStatus.completed.value
+        if row.status == TaskStatus.COMPLETED.value
         and row.completed_at is not None
         and row.completed_at.date() == day
     ]

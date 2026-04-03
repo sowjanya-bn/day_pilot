@@ -86,6 +86,7 @@ export default function App() {
   const [generatingDraft, setGeneratingDraft] = useState(false);
 
   const [newTask, setNewTask] = useState("");
+  const [expanded, setExpanded] = useState(false)
 
   const loadBrief = async (day = selectedDate) => {
     try {
@@ -377,125 +378,69 @@ export default function App() {
   };
 
   const renderBrief = () => {
-    const { guidance, stats, plan, yesterday_reflection } = brief || {};
+  const { guidance, stats, plan, yesterday_reflection, reflection } = brief || {};
 
-    return (
+  return (
+    <>
+      <Card title="Today">
+        <Text style={styles.focusText}>{guidance?.focus_message}</Text>
+
+        <View style={styles.statChipsRow}>
+          <StatChip label="Plan" value={stats?.planning_streak ?? 0} />
+          <StatChip label="Check-in" value={stats?.checkin_streak ?? 0} />
+          <StatChip label="Done 7d" value={stats?.completed_tasks_last_7_days ?? 0} />
+          <StatChip label="Open 7d" value={stats?.incomplete_tasks_last_7_days ?? 0} />
+        </View>
+
+        <Text style={styles.label}>Learning</Text>
+        <Text style={styles.value}>{guidance?.suggested_learning_next_step || "—"}</Text>
+
+        <Text style={styles.label}>Job</Text>
+        <Text style={styles.value}>{guidance?.suggested_job_nudge || "—"}</Text>
+
+        <Text style={styles.label}>Social</Text>
+        <Text style={styles.value}>{guidance?.suggested_social_nudge || "—"}</Text>
+      </Card>
+
+      {reflection && (
+  <Card title="Reflection">
+    {reflection.patterns?.length > 0 && (
       <>
-        <Card title="Focus">
-          <Text style={styles.focusText}>{guidance?.focus_message}</Text>
-        </Card>
-
-        <Card title="Carry-forward tasks">
-          {guidance?.carry_forward_tasks?.length ? (
-            guidance.carry_forward_tasks.map((task, index) => (
-              <Text key={index} style={styles.listItem}>
-                • {task}
-              </Text>
-            ))
-          ) : (
-            <Text style={styles.muted}>No carry-forward tasks</Text>
-          )}
-        </Card>
-
-        <Card title="Guidance">
-          <Text style={styles.label}>Learning</Text>
-          <Text style={styles.value}>
-            {guidance?.suggested_learning_next_step || "—"}
-          </Text>
-
-          <Text style={styles.label}>Job</Text>
-          <Text style={styles.value}>
-            {guidance?.suggested_job_nudge || "—"}
-          </Text>
-
-          <Text style={styles.label}>Social</Text>
-          <Text style={styles.value}>
-            {guidance?.suggested_social_nudge || "—"}
-          </Text>
-        </Card>
-
-        <Card title="Stats">
-          <Text style={styles.value}>
-            Planning streak: {stats?.planning_streak ?? 0}
-          </Text>
-          <Text style={styles.value}>
-            Check-in streak: {stats?.checkin_streak ?? 0}
-          </Text>
-          <Text style={styles.value}>
-            Completed in last 7 days: {stats?.completed_tasks_last_7_days ?? 0}
-          </Text>
-          <Text style={styles.value}>
-            Incomplete in last 7 days: {stats?.incomplete_tasks_last_7_days ?? 0}
-          </Text>
-        </Card>
-
-        <Card title="Today's plan">
-          <Text style={styles.label}>Agenda</Text>
-          <Text style={styles.value}>{plan?.agenda || "—"}</Text>
-
-          <Text style={styles.label}>Top priorities</Text>
-          {plan?.top_priorities?.length ? (
-            plan.top_priorities.map((item, index) => (
-              <Text key={index} style={styles.listItem}>
-                • {item}
-              </Text>
-            ))
-          ) : (
-            <Text style={styles.muted}>No priorities set</Text>
-          )}
-
-          <Text style={styles.label}>Learning goal</Text>
-          <Text style={styles.value}>{plan?.learning_goal || "—"}</Text>
-
-          <Text style={styles.label}>Job goal</Text>
-          <Text style={styles.value}>{plan?.job_goal || "—"}</Text>
-
-          <Text style={styles.label}>Social goal</Text>
-          <Text style={styles.value}>{plan?.social_goal || "—"}</Text>
-        </Card>
-
-        <Card title="Yesterday's reflection">
-          <Text style={styles.label}>Mood</Text>
-          <Text style={styles.value}>{yesterday_reflection?.mood || "—"}</Text>
-
-          <Text style={styles.label}>Completed</Text>
-          {yesterday_reflection?.completed?.length ? (
-            yesterday_reflection.completed.map((item, index) => (
-              <Text key={index} style={styles.listItem}>
-                • {item}
-              </Text>
-            ))
-          ) : (
-            <Text style={styles.muted}>No completed tasks</Text>
-          )}
-
-          <Text style={styles.label}>Incomplete</Text>
-          {yesterday_reflection?.incomplete?.length ? (
-            yesterday_reflection.incomplete.map((item, index) => (
-              <Text key={index} style={styles.listItem}>
-                • {item}
-              </Text>
-            ))
-          ) : (
-            <Text style={styles.muted}>No incomplete tasks</Text>
-          )}
-
-          <Text style={styles.label}>Learned</Text>
-          <Text style={styles.value}>
-            {yesterday_reflection?.learned || "—"}
-          </Text>
-
-          <Text style={styles.label}>Small win</Text>
-          <Text style={styles.value}>
-            {yesterday_reflection?.small_win || "—"}
-          </Text>
-
-          <Text style={styles.label}>Notes</Text>
-          <Text style={styles.value}>{yesterday_reflection?.notes || "—"}</Text>
-        </Card>
+        <Text style={styles.label}>What stood out</Text>
+        {reflection.patterns.map((p, i) => (
+          <Text key={i} style={styles.listItem}>• {p}</Text>
+        ))}
       </>
-    );
-  };
+    )}
+
+    {reflection.insight && (
+      <>
+        <Text style={styles.label}>What this may mean</Text>
+        <Text style={styles.value}>{reflection.insight}</Text>
+      </>
+    )}
+
+    {reflection.guidance?.length > 0 && (
+      <>
+        <Text style={styles.label}>Suggested next step</Text>
+        {reflection.guidance.map((g, i) => (
+          <Text key={i} style={styles.listItem}>• {g}</Text>
+        ))}
+      </>
+    )}
+  </Card>
+)}
+
+      {!!guidance?.carry_forward_tasks?.length && (
+        <Card title="Carry-forward tasks">
+          {guidance.carry_forward_tasks.map((task, index) => (
+            <Text key={index} style={styles.listItem}>• {task}</Text>
+          ))}
+        </Card>
+      )}
+    </>
+  );
+};
 
   const renderPlanForm = () => (
     <Card title="Create plan">
@@ -807,6 +752,15 @@ function NavButton({ label, active, onPress }) {
   );
 }
 
+function StatChip({ label, value }) {
+  return (
+    <View style={styles.statChip}>
+      <Text style={styles.statChipLabel}>{label}</Text>
+      <Text style={styles.statChipValue}>{value}</Text>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -1022,4 +976,26 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     fontSize: 13,
   },
+  statChipsRow: {
+  flexDirection: "row",
+  flexWrap: "wrap",
+  gap: 8,
+  marginTop: 12,
+  marginBottom: 8,
+},
+statChip: {
+  backgroundColor: "#f1f3f7",
+  borderRadius: 12,
+  paddingVertical: 8,
+  paddingHorizontal: 10,
+},
+statChipLabel: {
+  fontSize: 12,
+  color: "#666",
+},
+statChipValue: {
+  fontSize: 16,
+  fontWeight: "700",
+  color: "#111",
+},
 });
