@@ -14,16 +14,40 @@ import {
 import * as Clipboard from "expo-clipboard";
 
 import { getDailyBriefLocal } from "./src/local/brief/getDailyBriefLocal.ts";
-//import { mockRepository } from "./src/local/storage/mockRepository.ts";
 import { sqliteRepository } from "./src/local/storage/sqliteRepository";
 import { mapLocalBriefToUiShape } from "./src/local/brief/mapLocalBriefToUiShape.ts";
-
 import { initDb, seedDb } from "./src/local/storage/sqlite.ts";
-
-
 
 const API_BASE_URL = "http://localhost:8000/api";
 const DEFAULT_DATE = "2026-03-30";
+
+function toAppErrorDetails(error, extra) {
+  if (error instanceof Error) {
+    return {
+      name: error.name,
+      message: error.message,
+      stack: error.stack,
+      cause:
+        error.cause instanceof Error
+          ? `${error.cause.name}: ${error.cause.message}`
+          : error.cause
+            ? String(error.cause)
+            : undefined,
+      extra,
+    };
+  }
+
+  return {
+    name: "UnknownError",
+    message: typeof error === "string" ? error : JSON.stringify(error, null, 2),
+    extra,
+  };
+}
+
+function getErrorDisplayText(error) {
+  if (!error) return "";
+  return error.name ? `${error.name}: ${error.message}` : error.message;
+}
 
 async function apiPost(path, payload) {
   const response = await fetch(`${API_BASE_URL}${path}`, {
@@ -60,16 +84,26 @@ async function apiPut(path, payload) {
 }
 
 function shiftDate(isoDate, days) {
-  const d = new Date(`${isoDate}T00:00:00`);
-  d.setDate(d.getDate() + days);
+  const [year, month, day] = isoDate.split("-").map(Number);
+  const d = new Date(Date.UTC(year, month - 1, day));
+  d.setUTCDate(d.getUTCDate() + days);
   return d.toISOString().slice(0, 10);
+}
+
+function getLocalIsoDate() {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
 }
 
 export default function App() {
   const USE_LOCAL_BRIEF = true;
+
   const [brief, setBrief] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const [error, setError] = useState(null);
   const [screen, setScreen] = useState("brief");
 
   const [selectedDate, setSelectedDate] = useState(DEFAULT_DATE);
@@ -96,33 +130,39 @@ export default function App() {
   const [generatingDraft, setGeneratingDraft] = useState(false);
 
   const [newTask, setNewTask] = useState("");
-  const [expanded, setExpanded] = useState(false)
 
   const loadBrief = async (day = selectedDate) => {
     try {
       setLoading(true);
-      setError("");
+      setError(null);
 
       if (USE_LOCAL_BRIEF) {
-          console.log("=== DAILY BRIEF ===");
-          const localBrief = await getDailyBriefLocal(day, sqliteRepository);
-          const uiBrief = mapLocalBriefToUiShape(localBrief);
-          setBrief(uiBrief);
-
-      } else {
-          const response = await fetch(`${API_BASE_URL}/daily-brief/${day}`);
-          if (!response.ok) {
-            throw new Error(`Request failed: ${response.status}`);
-          }
-
-          const data = await response.json();
-          setBrief(data);
-
+        const localBrief = await getDailyBriefLocal(day, sqliteRepository);
+        console.log("Loaded local brief", { day, localBrief });
+        const uiBrief = mapLocalBriefToUiShape(localBrief);
+        console.log("Mapped local brief to UI shape", { uiBrief });
+        setBrief(uiBrief);
+        return;
       }
 
+      const response = await fetch(`${API_BASE_URL}/daily-brief/${day}`);
+      if (!response.ok) {
+        throw new Error(`Request failed: ${response.status}`);
+      }
 
+      const data = await response.json();
+      setBrief(data);
     } catch (err) {
-      setError(err.message || "Something went wrong");
+      const details = toAppErrorDetails(err, {
+        screen: "App",
+        action: "loadBrief",
+        day,
+        selectedDate,
+      });
+
+      console.error("Daily brief load failed", details);
+      setBrief(null);
+      setError(details);
     } finally {
       setLoading(false);
     }
@@ -134,8 +174,13 @@ export default function App() {
         await initDb();
         await seedDb();
         console.log("DB initialized");
-      } catch (e) {
-        console.error("DB init failed", e);
+      } catch (err) {
+        const details = toAppErrorDetails(err, {
+          screen: "App",
+          action: "setup",
+        });
+        console.error("DB init failed", details);
+        setError(details);
       }
     }
 
@@ -157,8 +202,13 @@ export default function App() {
       if (text) {
         setVoiceTranscript(text);
       }
-    } catch {
-      setError("Could not paste transcript from clipboard");
+    } catch (err) {
+      setError(
+        toAppErrorDetails(err, {
+          screen: "App",
+          action: "pasteTranscriptFromClipboard",
+        })
+      );
     }
   };
 
@@ -185,7 +235,7 @@ export default function App() {
   const generateCheckinDraft = async () => {
     try {
       setGeneratingDraft(true);
-      setError("");
+      setError(null);
 
       const payload = {
         date: checkinDate,
@@ -202,7 +252,13 @@ export default function App() {
       setMood(draft.mood || "steady");
       setNotes(draft.notes || "");
     } catch (err) {
-      setError(err.message || "Could not generate check-in draft");
+      setError(
+        toAppErrorDetails(err, {
+          screen: "App",
+          action: "generateCheckinDraft",
+          checkinDate,
+        })
+      );
     } finally {
       setGeneratingDraft(false);
     }
@@ -211,6 +267,8 @@ export default function App() {
   const addTask = async () => {
     try {
       if (!newTask.trim()) return;
+
+      setError(null);
 
       await apiPost("/tasks", {
         date: selectedDate,
@@ -222,13 +280,20 @@ export default function App() {
       setNewTask("");
       await loadBrief(selectedDate);
     } catch (err) {
-      setError(err.message || "Could not add task");
+      setError(
+        toAppErrorDetails(err, {
+          screen: "App",
+          action: "addTask",
+          selectedDate,
+          title: newTask,
+        })
+      );
     }
   };
 
   const toggleTaskStatus = async (taskId, nextStatus) => {
     try {
-      setError("");
+      setError(null);
 
       await apiPut(`/tasks/${taskId}/status`, {
         status: nextStatus,
@@ -236,14 +301,22 @@ export default function App() {
 
       await loadBrief(selectedDate);
     } catch (err) {
-      setError(err.message || "Could not update task");
+      setError(
+        toAppErrorDetails(err, {
+          screen: "App",
+          action: "toggleTaskStatus",
+          taskId,
+          nextStatus,
+          selectedDate,
+        })
+      );
     }
   };
 
   const submitPlan = async () => {
     try {
       setSubmittingPlan(true);
-      setError("");
+      setError(null);
 
       const payload = {
         date: planDate,
@@ -262,7 +335,13 @@ export default function App() {
       await loadBrief(planDate);
       setScreen("brief");
     } catch (err) {
-      setError(err.message || "Could not create plan");
+      setError(
+        toAppErrorDetails(err, {
+          screen: "App",
+          action: "submitPlan",
+          planDate,
+        })
+      );
     } finally {
       setSubmittingPlan(false);
     }
@@ -271,7 +350,7 @@ export default function App() {
   const submitCheckin = async () => {
     try {
       setSubmittingCheckin(true);
-      setError("");
+      setError(null);
 
       const completed = completedText
         .split("\n")
@@ -305,7 +384,13 @@ export default function App() {
       await loadBrief(checkinDate);
       setScreen("brief");
     } catch (err) {
-      setError(err.message || "Could not create check-in");
+      setError(
+        toAppErrorDetails(err, {
+          screen: "App",
+          action: "submitCheckin",
+          checkinDate,
+        })
+      );
     } finally {
       setSubmittingCheckin(false);
     }
@@ -333,8 +418,9 @@ export default function App() {
             <Pressable
               style={styles.dateChip}
               onPress={() => {
-                setSelectedDate(new Date().toISOString().slice(0, 10));
-                loadBrief(new Date().toISOString().slice(0, 10));
+                const today = new Date().toISOString().slice(0, 10);
+                setSelectedDate(today);
+                loadBrief(today);
               }}
             >
               <Text style={styles.dateChipText}>Today</Text>
@@ -413,66 +499,128 @@ export default function App() {
   };
 
   const renderBrief = () => {
-  const { guidance, stats, plan, yesterday_reflection, reflection } = brief || {};
+  const guidance = brief?.guidance ?? {};
+  const stats = brief?.stats ?? {};
+  const reflection = brief?.reflection ?? {};
+  const debug = brief?.debug ?? {};
 
   return (
     <>
       <Card title="Today">
-        <Text style={styles.focusText}>{guidance?.focus_message}</Text>
+        <Text style={styles.focusText}>
+          {guidance?.focus_message || "No guidance yet."}
+        </Text>
 
         <View style={styles.statChipsRow}>
           <StatChip label="Plan" value={stats?.planning_streak ?? 0} />
           <StatChip label="Check-in" value={stats?.checkin_streak ?? 0} />
-          <StatChip label="Done 7d" value={stats?.completed_tasks_last_7_days ?? 0} />
-          <StatChip label="Open 7d" value={stats?.incomplete_tasks_last_7_days ?? 0} />
+          <StatChip
+            label="Done 7d"
+            value={stats?.completed_tasks_last_7_days ?? 0}
+          />
+          <StatChip
+            label="Open 7d"
+            value={stats?.incomplete_tasks_last_7_days ?? 0}
+          />
         </View>
 
         <Text style={styles.label}>Learning</Text>
-        <Text style={styles.value}>{guidance?.suggested_learning_next_step || "—"}</Text>
+        <Text style={styles.value}>
+          {guidance?.suggested_learning_next_step || "—"}
+        </Text>
 
         <Text style={styles.label}>Job</Text>
-        <Text style={styles.value}>{guidance?.suggested_job_nudge || "—"}</Text>
+        <Text style={styles.value}>
+          {guidance?.suggested_job_nudge || "—"}
+        </Text>
 
         <Text style={styles.label}>Social</Text>
-        <Text style={styles.value}>{guidance?.suggested_social_nudge || "—"}</Text>
+        <Text style={styles.value}>
+          {guidance?.suggested_social_nudge || "—"}
+        </Text>
       </Card>
 
-      {reflection && (
-  <Card title="Reflection">
-    {reflection.patterns?.length > 0 && (
-      <>
-        <Text style={styles.label}>What stood out</Text>
-        {reflection.patterns.map((p, i) => (
-          <Text key={i} style={styles.listItem}>• {p}</Text>
-        ))}
-      </>
-    )}
+      {Array.isArray(reflection?.patterns) && reflection.patterns.length > 0 ? (
+        <Card title="Reflection">
+          <Text style={styles.label}>What stood out</Text>
+          {reflection.patterns.map((p, i) => (
+            <Text key={i} style={styles.listItem}>
+              • {p}
+            </Text>
+          ))}
 
-    {reflection.insight && (
-      <>
-        <Text style={styles.label}>What this may mean</Text>
-        <Text style={styles.value}>{reflection.insight}</Text>
-      </>
-    )}
+          {reflection.insight ? (
+            <>
+              <Text style={styles.label}>What this may mean</Text>
+              <Text style={styles.value}>{reflection.insight}</Text>
+            </>
+          ) : null}
 
-    {reflection.guidance?.length > 0 && (
-      <>
-        <Text style={styles.label}>Suggested next step</Text>
-        {reflection.guidance.map((g, i) => (
-          <Text key={i} style={styles.listItem}>• {g}</Text>
-        ))}
-      </>
-    )}
+          {Array.isArray(reflection?.guidance) && reflection.guidance.length > 0 ? (
+            <>
+              <Text style={styles.label}>Suggested next step</Text>
+              {reflection.guidance.map((g, i) => (
+                <Text key={i} style={styles.listItem}>
+                  • {g}
+                </Text>
+              ))}
+            </>
+          ) : null}
+        </Card>
+      ) : null}
+
+      {__DEV__ && brief?.reflection ? (
+  <Card title="Debug: Reflection">
+    <Text style={styles.value}>
+      Insight: {brief.reflection.insight || "—"}
+    </Text>
+
+    {Array.isArray(brief.reflection.patterns) &&
+      brief.reflection.patterns.map((p, i) => (
+        <Text key={i} style={styles.listItem}>• {p}</Text>
+      ))}
+
+    {Array.isArray(brief.reflection.guidance) &&
+      brief.reflection.guidance.map((g, i) => (
+        <Text key={i} style={styles.listItem}>→ {g}</Text>
+      ))}
   </Card>
-)}
+) : null}
 
-      {!!guidance?.carry_forward_tasks?.length && (
+      {Array.isArray(guidance?.carry_forward_tasks) &&
+      guidance.carry_forward_tasks.length > 0 ? (
         <Card title="Carry-forward tasks">
           {guidance.carry_forward_tasks.map((task, index) => (
-            <Text key={index} style={styles.listItem}>• {task}</Text>
+            <Text key={index} style={styles.listItem}>
+              • {String(task)}
+            </Text>
           ))}
         </Card>
-      )}
+      ) : null}
+
+      {__DEV__ && Array.isArray(debug?.findings) && debug.findings.length > 0 ? (
+        <Card title="Debug: Findings">
+          {debug.findings.map((finding, index) => (
+            <View key={index} style={{ marginBottom: 10 }}>
+              <Text style={styles.label}>
+                {finding.type} · {finding.severity} ·{" "}
+                {Math.round((finding.confidence ?? 0) * 100)}%
+              </Text>
+              <Text style={styles.value}>{finding.summary}</Text>
+            </View>
+          ))}
+        </Card>
+      ) : null}
+
+      {__DEV__ && Array.isArray(debug?.insights) && debug.insights.length > 0 ? (
+        <Card title="Debug: Insights">
+          {debug.insights.map((insight, index) => (
+            <Text key={index} style={styles.listItem}>
+              • {insight.message}
+            </Text>
+          ))}
+        </Card>
+      ) : null}
     </>
   );
 };
@@ -692,9 +840,43 @@ export default function App() {
 
   if (error && !brief) {
     return (
-      <SafeAreaView style={styles.centered}>
-        <Text style={styles.errorText}>Could not load daily brief</Text>
-        <Text style={styles.helperText}>{error}</Text>
+      <SafeAreaView style={styles.container}>
+        <ScrollView contentContainerStyle={styles.errorContainer}>
+          <Text style={styles.errorText}>Could not load daily brief</Text>
+          <Text style={styles.helperText}>{getErrorDisplayText(error)}</Text>
+
+          {error.extra ? (
+            <>
+              <Text style={styles.debugTitle}>Context</Text>
+              <Text selectable style={styles.debugText}>
+                {JSON.stringify(error.extra, null, 2)}
+              </Text>
+            </>
+          ) : null}
+
+          {error.cause ? (
+            <>
+              <Text style={styles.debugTitle}>Cause</Text>
+              <Text selectable style={styles.debugText}>{error.cause}</Text>
+            </>
+          ) : null}
+
+          {__DEV__ && error.stack ? (
+            <>
+              <Text style={styles.debugTitle}>Stack trace</Text>
+              <Text selectable style={styles.stackText}>
+                {error.stack}
+              </Text>
+            </>
+          ) : null}
+
+          <Pressable
+            style={styles.secondaryButton}
+            onPress={() => loadBrief(selectedDate)}
+          >
+            <Text style={styles.secondaryButtonText}>Retry</Text>
+          </Pressable>
+        </ScrollView>
       </SafeAreaView>
     );
   }
@@ -709,7 +891,7 @@ export default function App() {
         <ScrollView
           contentContainerStyle={styles.content}
           keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={true}
+          showsVerticalScrollIndicator
         >
           <Text style={styles.title}>DayPilot</Text>
           <Text style={styles.subtitle}>Your daily brief for {selectedDate}</Text>
@@ -737,7 +919,9 @@ export default function App() {
             />
           </View>
 
-          {error ? <Text style={styles.inlineError}>{error}</Text> : null}
+          {error ? (
+            <Text style={styles.inlineError}>{getErrorDisplayText(error)}</Text>
+          ) : null}
 
           {screen === "brief" && renderBrief()}
           {screen === "plan" && renderPlanForm()}
@@ -811,6 +995,11 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     padding: 24,
+  },
+  errorContainer: {
+    padding: 24,
+    flexGrow: 1,
+    justifyContent: "center",
   },
   title: {
     fontSize: 28,
@@ -930,6 +1119,8 @@ const styles = StyleSheet.create({
     marginTop: 8,
     color: "#666",
     textAlign: "center",
+    fontSize: 15,
+    lineHeight: 22,
   },
   errorText: {
     fontSize: 18,
@@ -940,6 +1131,28 @@ const styles = StyleSheet.create({
     color: "#b00020",
     fontSize: 14,
     marginBottom: 4,
+  },
+  debugTitle: {
+    marginTop: 20,
+    marginBottom: 8,
+    fontSize: 15,
+    fontWeight: "700",
+    color: "#111",
+  },
+  debugText: {
+    fontSize: 12,
+    lineHeight: 18,
+    color: "#333",
+  },
+  stackText: {
+    fontSize: 12,
+    lineHeight: 18,
+    color: "#333",
+    fontFamily: Platform.select({
+      ios: "Menlo",
+      android: "monospace",
+      default: "monospace",
+    }),
   },
   taskRow: {
     flexDirection: "row",
@@ -1012,25 +1225,25 @@ const styles = StyleSheet.create({
     fontSize: 13,
   },
   statChipsRow: {
-  flexDirection: "row",
-  flexWrap: "wrap",
-  gap: 8,
-  marginTop: 12,
-  marginBottom: 8,
-},
-statChip: {
-  backgroundColor: "#f1f3f7",
-  borderRadius: 12,
-  paddingVertical: 8,
-  paddingHorizontal: 10,
-},
-statChipLabel: {
-  fontSize: 12,
-  color: "#666",
-},
-statChipValue: {
-  fontSize: 16,
-  fontWeight: "700",
-  color: "#111",
-},
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginTop: 12,
+    marginBottom: 8,
+  },
+  statChip: {
+    backgroundColor: "#f1f3f7",
+    borderRadius: 12,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+  },
+  statChipLabel: {
+    fontSize: 12,
+    color: "#666",
+  },
+  statChipValue: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#111",
+  },
 });

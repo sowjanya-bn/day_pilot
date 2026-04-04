@@ -1,76 +1,67 @@
 import type {
+  AgentInsight,
   DailyContext,
-  Insight,
   PatternFinding,
-} from "../../domain/types.ts";
+} from "../domain/types.ts";
+
+function hasFinding(findings: PatternFinding[], type: string): boolean {
+  return findings.some((finding) => finding.type === type);
+}
+
+function getFinding(
+  findings: PatternFinding[],
+  type: string
+): PatternFinding | undefined {
+  return findings.find((finding) => finding.type === type);
+}
 
 export function synthesizeInsights(
   _context: DailyContext,
   findings: PatternFinding[]
-): Insight[] {
-  const insights: Insight[] = [];
-  const findingMap = new Map(findings.map((finding) => [finding.type, finding]));
+): AgentInsight[] {
+  if (findings.length === 0) {
+    return [
+      {
+        kind: "status",
+        message: "No strong risk signals stand out right now.",
+      },
+    ];
+  }
 
-  if (findingMap.has("carry_forward") && findingMap.has("overcommitment")) {
-    const carry = findingMap.get("carry_forward")!;
-    const over = findingMap.get("overcommitment")!;
+  const insights: AgentInsight[] = [];
 
+  const overcommitment = getFinding(findings, "overcommitment");
+  const carryForward = getFinding(findings, "carry_forward");
+
+  if (overcommitment && carryForward) {
     insights.push({
-      type: "planning_load",
-      priority: "high",
-      confidence: Math.min((carry.confidence + over.confidence) / 2, 0.95),
+      kind: "combined_load_signal",
       message:
-        "A few tasks seem to be dragging across days, which may mean the current plan is heavier than feels manageable right now.",
-      supportingPatterns: ["carry_forward", "overcommitment"],
+        "Work seems to be accumulating faster than it is being cleared. Lower recent completion and repeated carry-forward together suggest the current load may be slightly ahead of your available capacity.",
     });
-
-    return insights;
-  }
-
-  if (findingMap.has("overcommitment")) {
-    const over = findingMap.get("overcommitment")!;
+  } else if (overcommitment) {
     insights.push({
-      type: "planning_load",
-      priority: "medium",
-      confidence: over.confidence,
+      kind: "throughput_signal",
       message:
-        "It looks like your current plan might be a bit heavier than what feels manageable right now.",
-      supportingPatterns: ["overcommitment"],
+        "Your recent completion rate appears lower than your planning rate, which may mean the week was scoped a little too tightly or interrupted more than expected.",
     });
-  }
-
-  if (findingMap.has("backlog")) {
-    const backlog = findingMap.get("backlog")!;
+  } else if (carryForward) {
     insights.push({
-      type: "backlog_pressure",
-      priority: "medium",
-      confidence: backlog.confidence,
-      message: "Open work seems to be building up and may start creating pressure across the week.",
-      supportingPatterns: ["backlog"],
+      kind: "carry_forward_signal",
+      message:
+        "A number of tasks are rolling forward from earlier days, which suggests unresolved work may be starting to cluster rather than clearing naturally.",
     });
   }
 
-  if (findingMap.has("imbalance")) {
-    const imbalance = findingMap.get("imbalance")!;
+  const highest = findings[0];
+
+  if (highest?.severity === "high") {
     insights.push({
-      type: "attention_skew",
-      priority: "medium",
-      confidence: imbalance.confidence,
-      message: "Most of your recent energy seems to be going into one area, so another part of life may be drifting.",
-      supportingPatterns: ["imbalance"],
+      kind: "priority_signal",
+      message:
+        "This looks strong enough to treat as a real planning signal rather than a one-off blip.",
     });
   }
 
-  if (!insights.length && findings.length) {
-    const top = [...findings].sort((a, b) => b.confidence - a.confidence)[0];
-    insights.push({
-      type: "single_signal",
-      priority: "medium",
-      confidence: top.confidence,
-      message: top.summary,
-      supportingPatterns: [top.type],
-    });
-  }
-
-  return insights;
+  return insights.slice(0, 2);
 }
