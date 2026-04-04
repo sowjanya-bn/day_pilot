@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   SafeAreaView,
   ScrollView,
@@ -98,6 +98,18 @@ function getLocalIsoDate() {
   return `${year}-${month}-${day}`;
 }
 
+function formatShortReflection(patterns) {
+  if (!Array.isArray(patterns) || patterns.length === 0) {
+    return "No strong signals today.";
+  }
+
+  if (patterns.length === 1) {
+    return patterns[0];
+  }
+
+  return `${patterns[0]} + ${patterns.length - 1} more`;
+}
+
 export default function App() {
   const USE_LOCAL_BRIEF = true;
 
@@ -131,6 +143,10 @@ export default function App() {
 
   const [newTask, setNewTask] = useState("");
 
+  const [showReflectionDetails, setShowReflectionDetails] = useState(false);
+  const [showDebug, setShowDebug] = useState(false);
+  const [dateDraft, setDateDraft] = useState(DEFAULT_DATE);
+
   const loadBrief = async (day = selectedDate) => {
     try {
       setLoading(true);
@@ -138,9 +154,7 @@ export default function App() {
 
       if (USE_LOCAL_BRIEF) {
         const localBrief = await getDailyBriefLocal(day, sqliteRepository);
-        console.log("Loaded local brief", { day, localBrief });
         const uiBrief = mapLocalBriefToUiShape(localBrief);
-        console.log("Mapped local brief to UI shape", { uiBrief });
         setBrief(uiBrief);
         return;
       }
@@ -166,6 +180,12 @@ export default function App() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const changeDateAndLoad = async (newDate) => {
+    setSelectedDate(newDate);
+    setDateDraft(newDate);
+    await loadBrief(newDate);
   };
 
   useEffect(() => {
@@ -194,6 +214,7 @@ export default function App() {
   useEffect(() => {
     setPlanDate(selectedDate);
     setCheckinDate(selectedDate);
+    setDateDraft(selectedDate);
   }, [selectedDate]);
 
   const pasteTranscriptFromClipboard = async () => {
@@ -212,24 +233,24 @@ export default function App() {
     }
   };
 
-  const handleDateChange = (newDate) => {
-    setSelectedDate(newDate);
-  };
-
-  const loadSelectedDate = async () => {
-    await loadBrief(selectedDate);
-  };
-
   const goToPreviousDay = async () => {
     const newDate = shiftDate(selectedDate, -1);
-    setSelectedDate(newDate);
-    await loadBrief(newDate);
+    await changeDateAndLoad(newDate);
   };
 
   const goToNextDay = async () => {
     const newDate = shiftDate(selectedDate, 1);
-    setSelectedDate(newDate);
-    await loadBrief(newDate);
+    await changeDateAndLoad(newDate);
+  };
+
+  const goToToday = async () => {
+    const today = getLocalIsoDate();
+    await changeDateAndLoad(today);
+  };
+
+  const submitTypedDate = async () => {
+    if (!dateDraft?.trim()) return;
+    await changeDateAndLoad(dateDraft.trim());
   };
 
   const generateCheckinDraft = async () => {
@@ -331,8 +352,7 @@ export default function App() {
       };
 
       await apiPost("/planner", payload);
-      setSelectedDate(planDate);
-      await loadBrief(planDate);
+      await changeDateAndLoad(planDate);
       setScreen("brief");
     } catch (err) {
       setError(
@@ -380,8 +400,7 @@ export default function App() {
       };
 
       await apiPost("/checkin", payload);
-      setSelectedDate(checkinDate);
-      await loadBrief(checkinDate);
+      await changeDateAndLoad(checkinDate);
       setScreen("brief");
     } catch (err) {
       setError(
@@ -396,234 +415,306 @@ export default function App() {
     }
   };
 
-  const renderTasks = () => {
-    const { tasks } = brief || {};
-
-    return (
-      <>
-        <Card title="Date">
-          <TextInput
-            value={selectedDate}
-            onChangeText={handleDateChange}
-            onSubmitEditing={loadSelectedDate}
-            style={styles.input}
-            placeholder="YYYY-MM-DD"
-          />
-
-          <View style={styles.dateControls}>
-            <Pressable style={styles.dateChip} onPress={goToPreviousDay}>
-              <Text style={styles.dateChipText}>← Previous</Text>
-            </Pressable>
-
-            <Pressable
-              style={styles.dateChip}
-              onPress={() => {
-                const today = new Date().toISOString().slice(0, 10);
-                setSelectedDate(today);
-                loadBrief(today);
-              }}
-            >
-              <Text style={styles.dateChipText}>Today</Text>
-            </Pressable>
-
-            <Pressable style={styles.dateChip} onPress={goToNextDay}>
-              <Text style={styles.dateChipText}>Next →</Text>
-            </Pressable>
-          </View>
-
-          <Pressable style={styles.secondaryButton} onPress={loadSelectedDate}>
-            <Text style={styles.secondaryButtonText}>Load date</Text>
-          </Pressable>
-        </Card>
-
-        <Card title="Add task">
-          <TextInput
-            value={newTask}
-            onChangeText={setNewTask}
-            placeholder="What needs to be done?"
-            style={styles.input}
-          />
-
-          <Pressable style={styles.primaryButton} onPress={addTask}>
-            <Text style={styles.primaryButtonText}>Add</Text>
-          </Pressable>
-        </Card>
-
-        <Card title="Outstanding tasks">
-          {tasks?.outstanding?.length ? (
-            tasks.outstanding.map((task) => (
-              <View key={task.id} style={styles.taskRow}>
-                <View style={styles.taskTextBlock}>
-                  <Text style={styles.taskText}>{task.title}</Text>
-                  <Text style={styles.taskMeta}>
-                    {task.category} · {task.source}
-                  </Text>
-                </View>
-                <Pressable
-                  style={styles.taskActionButton}
-                  onPress={() => toggleTaskStatus(task.id, "completed")}
-                >
-                  <Text style={styles.taskActionButtonText}>Done</Text>
-                </Pressable>
-              </View>
-            ))
-          ) : (
-            <Text style={styles.muted}>No outstanding tasks</Text>
-          )}
-        </Card>
-
-        <Card title="Completed today">
-          {tasks?.completed?.length ? (
-            tasks.completed.map((task) => (
-              <View key={task.id} style={styles.taskRow}>
-                <View style={styles.taskTextBlock}>
-                  <Text style={styles.completedTaskText}>{task.title}</Text>
-                  <Text style={styles.taskMeta}>
-                    {task.category} · {task.source}
-                  </Text>
-                </View>
-                <Pressable
-                  style={styles.taskUndoButton}
-                  onPress={() => toggleTaskStatus(task.id, "outstanding")}
-                >
-                  <Text style={styles.taskUndoButtonText}>Undo</Text>
-                </Pressable>
-              </View>
-            ))
-          ) : (
-            <Text style={styles.muted}>No completed tasks today</Text>
-          )}
-        </Card>
-      </>
-    );
-  };
-
-  const renderBrief = () => {
   const guidance = brief?.guidance ?? {};
   const stats = brief?.stats ?? {};
   const reflection = brief?.reflection ?? {};
   const debug = brief?.debug ?? {};
+  const tasks = brief?.tasks ?? {};
 
-  return (
+  const staleTaskTitles = useMemo(() => {
+    const carryForward = Array.isArray(guidance?.carry_forward_tasks)
+      ? guidance.carry_forward_tasks
+      : [];
+    return carryForward;
+  }, [guidance]);
+
+const renderGlobalDatePanel = () => (
+  <View style={styles.dateToolbar}>
+    <TextInput
+      value={dateDraft}
+      onChangeText={setDateDraft}
+      onSubmitEditing={submitTypedDate}
+      style={styles.dateToolbarInput}
+      placeholder="YYYY-MM-DD"
+      autoCapitalize="none"
+      autoCorrect={false}
+    />
+
+    <Pressable style={styles.dateToolbarButton} onPress={goToPreviousDay}>
+      <Text style={styles.dateToolbarButtonText}>← Prev</Text>
+    </Pressable>
+
+    <Pressable style={styles.dateToolbarButton} onPress={goToToday}>
+      <Text style={styles.dateToolbarButtonText}>Today</Text>
+    </Pressable>
+
+    <Pressable style={styles.dateToolbarButton} onPress={goToNextDay}>
+      <Text style={styles.dateToolbarButtonText}>Next →</Text>
+    </Pressable>
+  </View>
+);
+
+  const renderBrief = () => {
+    const shortPatterns = Array.isArray(reflection?.patterns)
+      ? reflection.patterns
+      : [];
+    const nextSteps = Array.isArray(reflection?.guidance) ? reflection.guidance : [];
+
+    const hasMoreReflection =
+              shortPatterns.length > 1 || nextSteps.length > 1;
+
+    return (
+      <>
+        <Card title="Today" style={styles.todayCard}>
+          <Text style={styles.focusText}>
+            {guidance?.focus_message || "No guidance yet."}
+          </Text>
+
+          <View style={styles.statChipsRow}>
+            <StatChip label="Plan" value={stats?.planning_streak ?? 0} />
+            <StatChip label="Check-in" value={stats?.checkin_streak ?? 0} />
+            <StatChip
+              label="Done 7d"
+              value={stats?.completed_tasks_last_7_days ?? 0}
+            />
+            <StatChip
+              label="Open 7d"
+              value={stats?.incomplete_tasks_last_7_days ?? 0}
+            />
+          </View>
+
+          <Text style={styles.label}>Learning</Text>
+          <Text style={styles.value}>
+            {guidance?.suggested_learning_next_step || "—"}
+          </Text>
+
+          <Text style={styles.label}>Job</Text>
+          <Text style={styles.value}>
+            {guidance?.suggested_job_nudge || "—"}
+          </Text>
+
+          <Text style={styles.label}>Social</Text>
+          <Text style={styles.value}>
+            {guidance?.suggested_social_nudge || "—"}
+          </Text>
+        </Card>
+
+        {shortPatterns.length > 0 || reflection?.insight ? (
+          <Card title="Reflection">
+            <Text style={styles.label}>What stood out</Text>
+            <Text style={styles.value}>
+              {formatShortReflection(shortPatterns)}
+            </Text>
+
+            {reflection?.insight ? (
+              <>
+                <Text style={styles.label}>What this may mean</Text>
+                <Text numberOfLines={showReflectionDetails ? undefined : 4} style={styles.value}>
+                  {reflection.insight}
+                </Text>
+              </>
+            ) : null}
+
+            {nextSteps.length > 0 ? (
+              <>
+                <Text style={styles.label}>Suggested next step</Text>
+                <Text style={styles.value}>{nextSteps[0]}</Text>
+              </>
+            ) : null}
+
+
+
+            {hasMoreReflection && (
+              <Pressable
+                style={styles.inlineToggle}
+                onPress={() => setShowReflectionDetails((prev) => !prev)}
+              >
+                <Text style={styles.inlineToggleText}>
+                  {showReflectionDetails ? "Show less" : "Show more"}
+                </Text>
+              </Pressable>
+            )}
+
+            {showReflectionDetails && (
+              <View style={styles.expandedSection}>
+                {shortPatterns.length > 0 && (
+                  <>
+                    <Text style={styles.label}>All signals</Text>
+                    {shortPatterns.map((p, i) => (
+                      <Text key={i} style={styles.listItem}>
+                        • {p}
+                      </Text>
+                    ))}
+                  </>
+                )}
+
+                {nextSteps.length > 1 && (
+                  <>
+                    <Text style={styles.label}>More options</Text>
+                    {nextSteps.slice(1).map((g, i) => (
+                      <Text key={i} style={styles.listItem}>
+                        • {g}
+                      </Text>
+                    ))}
+                  </>
+                )}
+              </View>
+            )}
+          </Card>
+        ) : null}
+
+        {__DEV__ && (
+          <Card title="Debug">
+            <Pressable
+              style={styles.inlineToggle}
+              onPress={() => setShowDebug((prev) => !prev)}
+            >
+              <Text style={styles.inlineToggleText}>
+                {showDebug ? "Hide debug details" : "Show debug details"}
+              </Text>
+            </Pressable>
+
+            {showDebug && (
+              <View style={styles.expandedSection}>
+                {reflection?.insight ? (
+                  <>
+                    <Text style={styles.label}>Reflection insight</Text>
+                    <Text style={styles.value}>{reflection.insight}</Text>
+                  </>
+                ) : null}
+
+                {Array.isArray(reflection?.patterns) &&
+                  reflection.patterns.length > 0 && (
+                    <>
+                      <Text style={styles.label}>Patterns</Text>
+                      {reflection.patterns.map((p, i) => (
+                        <Text key={i} style={styles.listItem}>
+                          • {p}
+                        </Text>
+                      ))}
+                    </>
+                  )}
+
+                {Array.isArray(reflection?.guidance) &&
+                  reflection.guidance.length > 0 && (
+                    <>
+                      <Text style={styles.label}>Guidance</Text>
+                      {reflection.guidance.map((g, i) => (
+                        <Text key={i} style={styles.listItem}>
+                          → {g}
+                        </Text>
+                      ))}
+                    </>
+                  )}
+
+                {Array.isArray(debug?.findings) && debug.findings.length > 0 && (
+                  <>
+                    <Text style={styles.label}>Findings</Text>
+                    {debug.findings.map((finding, index) => (
+                      <Text key={index} style={styles.listItem}>
+                        • {finding.type} ({finding.severity}) —{" "}
+                        {Math.round((finding.confidence ?? 0) * 100)}%
+                      </Text>
+                    ))}
+                  </>
+                )}
+
+                {Array.isArray(debug?.insights) && debug.insights.length > 0 && (
+                  <>
+                    <Text style={styles.label}>Insights</Text>
+                    {debug.insights.map((insight, index) => (
+                      <Text key={index} style={styles.listItem}>
+                        • {insight.message}
+                      </Text>
+                    ))}
+                  </>
+                )}
+              </View>
+            )}
+          </Card>
+        )}
+      </>
+    );
+  };
+
+  const renderTasks = () => (
     <>
-      <Card title="Today">
-        <Text style={styles.focusText}>
-          {guidance?.focus_message || "No guidance yet."}
-        </Text>
+      {staleTaskTitles.length > 0 && (
+        <Card title="Needs attention">
+          <Text style={styles.value}>
+            These tasks have been carried forward and probably deserve a proper reset.
+          </Text>
 
-        <View style={styles.statChipsRow}>
-          <StatChip label="Plan" value={stats?.planning_streak ?? 0} />
-          <StatChip label="Check-in" value={stats?.checkin_streak ?? 0} />
-          <StatChip
-            label="Done 7d"
-            value={stats?.completed_tasks_last_7_days ?? 0}
-          />
-          <StatChip
-            label="Open 7d"
-            value={stats?.incomplete_tasks_last_7_days ?? 0}
-          />
-        </View>
+          <View style={styles.compactList}>
+            {staleTaskTitles.map((task, index) => (
+              <Text key={index} style={styles.listItem}>
+                • {String(task)}
+              </Text>
+            ))}
+          </View>
+        </Card>
+      )}
 
-        <Text style={styles.label}>Learning</Text>
-        <Text style={styles.value}>
-          {guidance?.suggested_learning_next_step || "—"}
-        </Text>
+      <Card title="Add task">
+        <TextInput
+          value={newTask}
+          onChangeText={setNewTask}
+          placeholder="What needs to be done?"
+          style={styles.input}
+        />
 
-        <Text style={styles.label}>Job</Text>
-        <Text style={styles.value}>
-          {guidance?.suggested_job_nudge || "—"}
-        </Text>
-
-        <Text style={styles.label}>Social</Text>
-        <Text style={styles.value}>
-          {guidance?.suggested_social_nudge || "—"}
-        </Text>
+        <Pressable style={styles.primaryButton} onPress={addTask}>
+          <Text style={styles.primaryButtonText}>Add</Text>
+        </Pressable>
       </Card>
 
-      {Array.isArray(reflection?.patterns) && reflection.patterns.length > 0 ? (
-        <Card title="Reflection">
-          <Text style={styles.label}>What stood out</Text>
-          {reflection.patterns.map((p, i) => (
-            <Text key={i} style={styles.listItem}>
-              • {p}
-            </Text>
-          ))}
-
-          {reflection.insight ? (
-            <>
-              <Text style={styles.label}>What this may mean</Text>
-              <Text style={styles.value}>{reflection.insight}</Text>
-            </>
-          ) : null}
-
-          {Array.isArray(reflection?.guidance) && reflection.guidance.length > 0 ? (
-            <>
-              <Text style={styles.label}>Suggested next step</Text>
-              {reflection.guidance.map((g, i) => (
-                <Text key={i} style={styles.listItem}>
-                  • {g}
+      <Card title="Outstanding tasks">
+        {tasks?.outstanding?.length ? (
+          tasks.outstanding.map((task) => (
+            <View key={task.id} style={styles.taskRow}>
+              <View style={styles.taskTextBlock}>
+                <Text style={styles.taskText}>{task.title}</Text>
+                <Text style={styles.taskMeta}>
+                  {task.category} · {task.source}
                 </Text>
-              ))}
-            </>
-          ) : null}
-        </Card>
-      ) : null}
-
-      {__DEV__ && brief?.reflection ? (
-  <Card title="Debug: Reflection">
-    <Text style={styles.value}>
-      Insight: {brief.reflection.insight || "—"}
-    </Text>
-
-    {Array.isArray(brief.reflection.patterns) &&
-      brief.reflection.patterns.map((p, i) => (
-        <Text key={i} style={styles.listItem}>• {p}</Text>
-      ))}
-
-    {Array.isArray(brief.reflection.guidance) &&
-      brief.reflection.guidance.map((g, i) => (
-        <Text key={i} style={styles.listItem}>→ {g}</Text>
-      ))}
-  </Card>
-) : null}
-
-      {Array.isArray(guidance?.carry_forward_tasks) &&
-      guidance.carry_forward_tasks.length > 0 ? (
-        <Card title="Carry-forward tasks">
-          {guidance.carry_forward_tasks.map((task, index) => (
-            <Text key={index} style={styles.listItem}>
-              • {String(task)}
-            </Text>
-          ))}
-        </Card>
-      ) : null}
-
-      {__DEV__ && Array.isArray(debug?.findings) && debug.findings.length > 0 ? (
-        <Card title="Debug: Findings">
-          {debug.findings.map((finding, index) => (
-            <View key={index} style={{ marginBottom: 10 }}>
-              <Text style={styles.label}>
-                {finding.type} · {finding.severity} ·{" "}
-                {Math.round((finding.confidence ?? 0) * 100)}%
-              </Text>
-              <Text style={styles.value}>{finding.summary}</Text>
+              </View>
+              <Pressable
+                style={styles.taskActionButton}
+                onPress={() => toggleTaskStatus(task.id, "completed")}
+              >
+                <Text style={styles.taskActionButtonText}>Done</Text>
+              </Pressable>
             </View>
-          ))}
-        </Card>
-      ) : null}
+          ))
+        ) : (
+          <Text style={styles.muted}>No outstanding tasks</Text>
+        )}
+      </Card>
 
-      {__DEV__ && Array.isArray(debug?.insights) && debug.insights.length > 0 ? (
-        <Card title="Debug: Insights">
-          {debug.insights.map((insight, index) => (
-            <Text key={index} style={styles.listItem}>
-              • {insight.message}
-            </Text>
-          ))}
-        </Card>
-      ) : null}
+      <Card title="Completed today">
+        {tasks?.completed?.length ? (
+          tasks.completed.map((task) => (
+            <View key={task.id} style={styles.taskRow}>
+              <View style={styles.taskTextBlock}>
+                <Text style={styles.completedTaskText}>{task.title}</Text>
+                <Text style={styles.taskMeta}>
+                  {task.category} · {task.source}
+                </Text>
+              </View>
+              <Pressable
+                style={styles.taskUndoButton}
+                onPress={() => toggleTaskStatus(task.id, "outstanding")}
+              >
+                <Text style={styles.taskUndoButtonText}>Undo</Text>
+              </Pressable>
+            </View>
+          ))
+        ) : (
+          <Text style={styles.muted}>No completed tasks today</Text>
+        )}
+      </Card>
     </>
   );
-};
 
   const renderPlanForm = () => (
     <Card title="Create plan">
@@ -894,7 +985,8 @@ export default function App() {
           showsVerticalScrollIndicator
         >
           <Text style={styles.title}>DayPilot</Text>
-          <Text style={styles.subtitle}>Your daily brief for {selectedDate}</Text>
+
+          {renderGlobalDatePanel()}
 
           <View style={styles.navRow}>
             <NavButton
@@ -940,9 +1032,9 @@ export default function App() {
   );
 }
 
-function Card({ title, children }) {
+function Card({ title, children, style }) {
   return (
-    <View style={styles.card}>
+    <View style={[styles.card, style]}>
       <Text style={styles.cardTitle}>{title}</Text>
       {children}
     </View>
@@ -1011,10 +1103,11 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   navRow: {
-    flexDirection: "row",
-    gap: 8,
-    marginBottom: 8,
-  },
+      flexDirection: "row",
+      gap: 8,
+      marginBottom: 8, // slightly tighter grouping
+      flexWrap: "wrap",
+    },
   navButton: {
     paddingVertical: 10,
     paddingHorizontal: 14,
@@ -1032,19 +1125,23 @@ const styles = StyleSheet.create({
     color: "#fff",
   },
   card: {
-    backgroundColor: "white",
-    borderRadius: 16,
-    padding: 16,
-    shadowColor: "#000",
-    shadowOpacity: 0.05,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 3 },
-    elevation: 2,
-  },
+      backgroundColor: "#f8f9fb",
+      borderRadius: 16,
+      padding: 14, // was 16
+      shadowColor: "#000",
+      shadowOpacity: 0.04,
+      shadowRadius: 10,
+      shadowOffset: { width: 0, height: 3 },
+      elevation: 2,
+    },
+    todayCard: {
+      backgroundColor: "white",
+      shadowOpacity: 0.06,
+    },
   cardTitle: {
     fontSize: 18,
     fontWeight: "600",
-    marginBottom: 12,
+    marginBottom: 10,
   },
   focusText: {
     fontSize: 16,
@@ -1054,11 +1151,12 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   label: {
-    fontSize: 14,
-    fontWeight: "600",
-    marginTop: 6,
-    marginBottom: 4,
-  },
+      fontSize: 13,
+      fontWeight: "600",
+      color: "#555", // instead of default black
+      marginTop: 8,
+      marginBottom: 4,
+    },
   value: {
     fontSize: 15,
     lineHeight: 22,
@@ -1069,6 +1167,9 @@ const styles = StyleSheet.create({
     lineHeight: 22,
     marginBottom: 4,
     color: "#222",
+  },
+  compactList: {
+    marginTop: 8,
   },
   muted: {
     fontSize: 14,
@@ -1246,4 +1347,43 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     color: "#111",
   },
+  inlineToggle: {
+    marginTop: 10,
+    alignSelf: "flex-start",
+  },
+  inlineToggleText: {
+    color: "#4f46e5",
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  expandedSection: {
+    marginTop: 8,
+  },
+  dateToolbar: {
+  flexDirection: "row",
+  alignItems: "center",
+  gap: 6,
+  marginBottom: 6, // was 2 or 4
+},
+
+dateToolbarInput: {
+  flex: 1,
+  minWidth: 110,
+  borderWidth: 1,
+  borderColor: "#ddd",
+  borderRadius: 10,
+  paddingHorizontal: 12,
+  paddingVertical: 8,
+  backgroundColor: "#fff",
+  fontSize: 15,
+},
+
+dateToolbarButton: {
+  backgroundColor: "#e9e9ee",
+  paddingHorizontal: 11,
+  paddingVertical: 9,
+  borderRadius: 10,
+  alignItems: "center",
+  justifyContent: "center",
+},
 });
