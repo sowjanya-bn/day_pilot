@@ -13,6 +13,15 @@ import {
 } from "react-native";
 import * as Clipboard from "expo-clipboard";
 
+import { getDailyBriefLocal } from "./src/local/brief/getDailyBriefLocal.ts";
+//import { mockRepository } from "./src/local/storage/mockRepository.ts";
+import { sqliteRepository } from "./src/local/storage/sqliteRepository";
+import { mapLocalBriefToUiShape } from "./src/local/brief/mapLocalBriefToUiShape.ts";
+
+import { initDb, seedDb } from "./src/local/storage/sqlite.ts";
+
+
+
 const API_BASE_URL = "http://localhost:8000/api";
 const DEFAULT_DATE = "2026-03-30";
 
@@ -57,6 +66,7 @@ function shiftDate(isoDate, days) {
 }
 
 export default function App() {
+  const USE_LOCAL_BRIEF = true;
   const [brief, setBrief] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -93,19 +103,44 @@ export default function App() {
       setLoading(true);
       setError("");
 
-      const response = await fetch(`${API_BASE_URL}/daily-brief/${day}`);
-      if (!response.ok) {
-        throw new Error(`Request failed: ${response.status}`);
+      if (USE_LOCAL_BRIEF) {
+          console.log("=== DAILY BRIEF ===");
+          const localBrief = await getDailyBriefLocal(day, sqliteRepository);
+          const uiBrief = mapLocalBriefToUiShape(localBrief);
+          setBrief(uiBrief);
+
+      } else {
+          const response = await fetch(`${API_BASE_URL}/daily-brief/${day}`);
+          if (!response.ok) {
+            throw new Error(`Request failed: ${response.status}`);
+          }
+
+          const data = await response.json();
+          setBrief(data);
+
       }
 
-      const data = await response.json();
-      setBrief(data);
+
     } catch (err) {
       setError(err.message || "Something went wrong");
     } finally {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    async function setup() {
+      try {
+        await initDb();
+        await seedDb();
+        console.log("DB initialized");
+      } catch (e) {
+        console.error("DB init failed", e);
+      }
+    }
+
+    setup();
+  }, []);
 
   useEffect(() => {
     loadBrief(DEFAULT_DATE);

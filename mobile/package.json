@@ -11,9 +11,15 @@
   },
   "dependencies": {
     "expo": "~53.0.20",
+    "expo-asset": "~11.1.7",
     "expo-clipboard": "~7.1.5",
+    "expo-sqlite": "~15.2.14",
     "expo-status-bar": "~2.2.3",
     "react": "19.0.0",
     "react-native": "0.79.5"
+  },
+  "devDependencies": {
+    "@types/react": "~19.0.10",
+    "typescript": "~5.8.3"
   }
 }
