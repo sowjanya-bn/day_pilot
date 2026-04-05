@@ -93,7 +93,7 @@ export async function buildGuidanceFromAgentAndTasks(
 
   let enhancedMessage: string | null = null;
 
-  console.log('Agent Report Findings:', agentReport.findings);
+//   console.log('Agent Report Findings:', agentReport.findings);
 
   if (enhancer && primary) {
     console.log('Enhancing guidance message with LLM Enhancer...');
@@ -104,7 +104,7 @@ export async function buildGuidanceFromAgentAndTasks(
     });
   }
 
-  console.log('Enhanced Guidance Message:', enhancedMessage);
+//   console.log('Enhanced Guidance Message:', enhancedMessage);
 
   return {
     date,
@@ -154,7 +154,7 @@ export async function getDailyBriefLocal(
     ENABLE_LLM ? ollamaEnhancer : undefined,
   );
 
-  console.log('Generated Guidance:', guidance);
+//   console.log('Generated Guidance:', guidance);
   const reflection = mapAgentToBrief(agentReport);
 
   return {

@@ -128,3 +128,30 @@ export async function saveCheckinLocal(input: SaveCheckinInput): Promise<void> {
     ],
   );
 }
+
+export function shiftDate(isoDate: string, days: number): string {
+  const [year, month, day] = isoDate.split('-').map(Number);
+  const d = new Date(Date.UTC(year, month - 1, day));
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
+export async function deferTaskByOneDay(taskId: number) {
+  const db = await getDb();
+
+  const task = await db.getFirstAsync(
+    `SELECT assigned_date FROM taskentity WHERE id = ?`,
+    [taskId]
+  );
+
+  if (!task) return;
+
+  const nextDate = shiftDate(task.assigned_date, 1);
+
+  await db.runAsync(
+    `UPDATE taskentity
+     SET assigned_date = ?, updated_at = ?
+     WHERE id = ?`,
+    [nextDate, new Date().toISOString(), taskId]
+  );
+}

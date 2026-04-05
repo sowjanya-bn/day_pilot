@@ -17,6 +17,8 @@ import { getDailyBriefLocal } from './src/local/brief/getDailyBriefLocal.ts';
 import { sqliteRepository } from './src/local/storage/sqliteRepository';
 import { mapLocalBriefToUiShape } from './src/local/brief/mapLocalBriefToUiShape.ts';
 import { initDb, seedDb } from './src/local/storage/sqlite.ts';
+import { evaluatePlan } from './src/local/agent/interventions/evaluatePlan.ts';
+import { deferTaskByOneDay } from './src/local/storage/sqliteMutations.ts';
 
 import {
   addTaskLocal,
@@ -162,6 +164,12 @@ export default function App() {
   const [showReflectionDetails, setShowReflectionDetails] = useState(false);
   const [showDebug, setShowDebug] = useState(false);
   const [dateDraft, setDateDraft] = useState(DEFAULT_DATE);
+  const [planInterventions, setPlanInterventions] = useState([]);
+
+  const [localTasks, setLocalTasks] = useState({
+      outstanding: [],
+      completed: [],
+    });
 
   const loadBrief = async (day = selectedDate) => {
     try {
@@ -227,6 +235,34 @@ export default function App() {
 
     setup();
   }, []);
+
+  useEffect(() => {
+      if (!brief?.tasks) return;
+
+      setLocalTasks({
+        outstanding: Array.isArray(brief.tasks.outstanding)
+          ? brief.tasks.outstanding
+          : [],
+        completed: Array.isArray(brief.tasks.completed)
+          ? brief.tasks.completed
+          : [],
+      });
+    }, [brief]);
+
+  useEffect(() => {
+      const outstanding = Array.isArray(localTasks?.outstanding)
+        ? localTasks.outstanding
+        : [];
+
+      const interventions = evaluatePlan(outstanding, {
+        state: {
+          staleTaskIds: outstanding.map((t) => t.id),
+        },
+      });
+
+      console.log('Evaluated plan interventions', { interventions });
+      setPlanInterventions(interventions);
+    }, [localTasks]);
 
   useEffect(() => {
     loadBrief(DEFAULT_DATE);
@@ -333,24 +369,83 @@ export default function App() {
     }
   };
 
-  const toggleTaskStatus = async (taskId, nextStatus) => {
-    try {
-      setError(null);
+  const deferTask = async (taskId) => {
+  try {
+    setError(null);
 
+    setLocalTasks((prev) => ({
+      ...prev,
+      outstanding: prev.outstanding.filter((t) => t.id !== taskId),
+    }));
+
+    await deferTaskByOneDay(taskId);
+    await loadBrief(selectedDate);
+  } catch (err) {
+    await loadBrief(selectedDate);
+    setError(
+      toAppErrorDetails(err, {
+        screen: 'App',
+        action: 'deferTask',
+        taskId,
+        selectedDate,
+      }),
+    );
+  }
+};
+
+  const toggleTaskStatus = async (taskId, nextStatus) => {
+  try {
+    setError(null);
+
+    const task =
+      localTasks.outstanding.find((t) => t.id === taskId) ||
+      localTasks.completed.find((t) => t.id === taskId);
+
+    if (!task) {
       await updateTaskStatusLocal(taskId, nextStatus);
       await loadBrief(selectedDate);
-    } catch (err) {
-      setError(
-        toAppErrorDetails(err, {
-          screen: 'App',
-          action: 'toggleTaskStatus',
-          taskId,
-          nextStatus,
-          selectedDate,
-        }),
-      );
+      return;
     }
-  };
+
+    if (nextStatus === 'completed') {
+      const updatedTask = {
+        ...task,
+        status: 'completed',
+        completedAt: new Date().toISOString(),
+      };
+
+      setLocalTasks((prev) => ({
+        outstanding: prev.outstanding.filter((t) => t.id !== taskId),
+        completed: [updatedTask, ...prev.completed],
+      }));
+    } else {
+      const updatedTask = {
+        ...task,
+        status: 'outstanding',
+        completedAt: null,
+      };
+
+      setLocalTasks((prev) => ({
+        outstanding: [updatedTask, ...prev.outstanding.filter((t) => t.id !== taskId)],
+        completed: prev.completed.filter((t) => t.id !== taskId),
+      }));
+    }
+
+    await updateTaskStatusLocal(taskId, nextStatus);
+    await loadBrief(selectedDate);
+  } catch (err) {
+    await loadBrief(selectedDate);
+    setError(
+      toAppErrorDetails(err, {
+        screen: 'App',
+        action: 'toggleTaskStatus',
+        taskId,
+        nextStatus,
+        selectedDate,
+      }),
+    );
+  }
+};
 
   const submitPlan = async () => {
     try {
@@ -680,6 +775,13 @@ export default function App() {
 
   const renderTasks = () => (
     <>
+      {planInterventions.length > 0 && (
+          <View style={styles.nudge}>
+            <Text style={styles.nudgeText}>
+              {planInterventions[0].message}
+            </Text>
+          </View>
+        )}
       {staleTaskTitles.length > 0 && (
         <Card title="Needs attention">
           <Text style={styles.value}>
@@ -711,8 +813,8 @@ export default function App() {
       </Card>
 
       <Card title="Outstanding tasks">
-        {tasks?.outstanding?.length ? (
-          tasks.outstanding.map((task) => (
+        {localTasks.outstanding.length ? (
+          localTasks.outstanding.map((task) => (
             <View key={task.id} style={styles.taskRow}>
               <View style={styles.taskTextBlock}>
                 <Text style={styles.taskText}>{task.title}</Text>
@@ -726,6 +828,12 @@ export default function App() {
               >
                 <Text style={styles.taskActionButtonText}>Done</Text>
               </Pressable>
+              <Pressable
+                  style={styles.taskDeferButton}
+                  onPress={() => deferTask(task.id)}
+                >
+                  <Text style={styles.taskDeferButtonText}>Defer</Text>
+                </Pressable>
             </View>
           ))
         ) : (
@@ -734,8 +842,8 @@ export default function App() {
       </Card>
 
       <Card title="Completed today">
-        {tasks?.completed?.length ? (
-          tasks.completed.map((task) => (
+        {localTasks.completed.length ? (
+          localTasks.completed.map((task) => (
             <View key={task.id} style={styles.taskRow}>
               <View style={styles.taskTextBlock}>
                 <Text style={styles.completedTaskText}>{task.title}</Text>
@@ -1466,4 +1574,16 @@ const styles = StyleSheet.create({
   severityHigh: { color: '#222' },
   severityMedium: { color: '#555' },
   severityLow: { color: '#888' },
+
+  nudge: {
+  backgroundColor: '#fff3cd',
+  padding: 10,
+  borderRadius: 10,
+  marginBottom: 10,
+},
+
+nudgeText: {
+  fontSize: 13,
+  color: '#444',
+},
 });
