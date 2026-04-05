@@ -33,7 +33,7 @@ export const ollamaEnhancer: LLMEnhancer = {
     try {
       const prompt = buildPrompt(input);
 
-//       console.log('Sending prompt to Ollama:', prompt);
+      //       console.log('Sending prompt to Ollama:', prompt);
 
       const res = await fetch(OLLAMA_URL, {
         method: 'POST',
@@ -54,7 +54,7 @@ export const ollamaEnhancer: LLMEnhancer = {
       const data = await res.json();
       const text = data?.response?.trim?.();
 
-//       console.log('Received response from Ollama:', text);
+      //       console.log('Received response from Ollama:', text);
 
       return text || null;
     } catch (err) {

@@ -141,7 +141,7 @@ export async function deferTaskByOneDay(taskId: number) {
 
   const task = await db.getFirstAsync(
     `SELECT assigned_date FROM taskentity WHERE id = ?`,
-    [taskId]
+    [taskId],
   );
 
   if (!task) return;
@@ -152,6 +152,6 @@ export async function deferTaskByOneDay(taskId: number) {
     `UPDATE taskentity
      SET assigned_date = ?, updated_at = ?
      WHERE id = ?`,
-    [nextDate, new Date().toISOString(), taskId]
+    [nextDate, new Date().toISOString(), taskId],
   );
 }

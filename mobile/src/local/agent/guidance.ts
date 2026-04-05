@@ -17,7 +17,7 @@ export async function buildGuidanceFromAgentAndTasks(
   const guidanceItems = agentReport.guidance ?? [];
   const primary = guidanceItems[0];
 
-//   console.log('Agent Report Findings:', agentReport.findings);
+  //   console.log('Agent Report Findings:', agentReport.findings);
 
   const carryForwardTasks = todaysTasks
     .filter((task) => task.status === 'outstanding')
