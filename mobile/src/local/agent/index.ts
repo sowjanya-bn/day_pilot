@@ -1,17 +1,19 @@
 import type {
-  AgentReport,
   DailyContext,
+  Insight,
   PatternFinding,
 } from "../domain/types.ts";
 import { detectOvercommitment } from "./detectors/detectOvercommitment.ts";
 import { detectCarryForward } from "./detectors/detectCarryForward.ts";
+import { detectBacklogPressure } from "./detectors/detectBacklogPressure.ts";
 import { processFindings } from "./processFindings.ts";
 import { generateGuidance } from "./guidance.ts";
-import { synthesizeInsights } from "./synthesizer.ts";
+import { synthesizeInsights } from "./synthesizeInsights.ts";
 
 const detectors = [
   detectOvercommitment,
   detectCarryForward,
+  detectBacklogPressure,
 ];
 
 export function generateAgentReport(context: DailyContext): AgentReport {

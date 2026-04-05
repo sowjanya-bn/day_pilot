@@ -58,6 +58,30 @@ function buildCarryForwardGuidance(date: string, todaysTasks: Task[]): CarryForw
     focusMessage: "Keep the day simple and move one important thing forward.",
   };
 }
+export function buildGuidanceFromAgentAndTasks(
+  date: string,
+  todaysTasks: Task[],
+  agentReport: AgentReport
+) {
+  const topGuidance = agentReport.guidance[0];
+  const carryForwardTasks = todaysTasks
+    .filter((task) => task.status === "outstanding")
+    .map((task) => task.title);
+
+  return {
+    date,
+    focusMessage:
+      topGuidance?.message ??
+      "Keep the day simple and move one important thing forward.",
+    suggestedLearningNextStep:
+      "Spend 20 minutes on your current learning goal.",
+    suggestedJobNudge:
+      "Take one small job-search action today.",
+    suggestedSocialNudge:
+      "Send one small message or start one light conversation.",
+    carryForwardTasks,
+  };
+}
 
 export async function getDailyBriefLocal(
   date: string,
@@ -74,10 +98,16 @@ export async function getDailyBriefLocal(
 
   const stats = buildStats(date, tasksIn7d);
   const tasks = buildTaskList(date, todaysTasks);
-  const guidance = buildCarryForwardGuidance(date, todaysTasks);
 
   const context = collectDailyContext(date, tasksIn7d);
   const agentReport = generateAgentReport(context);
+
+  const guidance = buildGuidanceFromAgentAndTasks(
+    date,
+    todaysTasks,
+    agentReport
+  );
+
   const reflection = mapAgentToBrief(agentReport);
 
   return {
@@ -88,5 +118,10 @@ export async function getDailyBriefLocal(
     stats,
     tasks,
     reflection,
+    debug: {
+      findings: agentReport.findings,
+      insights: agentReport.insights,
+      guidance: agentReport.guidance,
+    },
   };
 }

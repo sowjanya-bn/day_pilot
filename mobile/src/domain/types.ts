@@ -55,20 +55,25 @@ export interface PatternFinding {
   dedupeKey?: string;
 }
 
-export interface AgentInsight {
-  kind: string;
+export interface Insight {
+  type: string;
   message: string;
 }
 
-export interface AgentGuidance {
-  focusMessage?: string;
-  carryForwardTaskIds?: number[];
-  nextStep?: string;
+export type GuidancePriority = "low" | "medium" | "high";
+
+export interface GuidanceItem {
+  type: string;
+  priority: GuidancePriority;
+  title: string;
+  message: string;
+  action: string;
+  parameters?: Record<string, unknown>;
 }
 
 export interface AgentReport {
   date: string;
   findings: PatternFinding[];
-  insights: AgentInsight[];
-  guidance: AgentGuidance;
+  insights: Insight[];
+  guidance: GuidanceItem[];
 }

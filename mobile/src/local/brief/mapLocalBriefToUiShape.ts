@@ -3,6 +3,7 @@ export function mapLocalBriefToUiShape(localBrief: any) {
   const reflection = localBrief?.reflection ?? {};
   const stats = localBrief?.stats ?? {};
   const tasks = localBrief?.tasks ?? {};
+  const debug = localBrief?.debug ?? {};
 
   return {
     guidance: {
@@ -24,9 +25,12 @@ export function mapLocalBriefToUiShape(localBrief: any) {
       guidance: Array.isArray(reflection.nextSteps) ? reflection.nextSteps : [],
     },
 
+
+
     debug: {
-      findings: Array.isArray(localBrief?.findings) ? localBrief.findings : [],
-      insights: Array.isArray(localBrief?.insights) ? localBrief.insights : [],
+      findings: Array.isArray(debug?.findings) ? debug.findings : [],
+      insights: Array.isArray(debug?.insights) ? debug.insights : [],
+      guidance: Array.isArray(debug?.guidance) ? debug.guidance : [],
     },
 
     stats: {

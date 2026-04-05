@@ -162,6 +162,11 @@ export default function App() {
       if (USE_LOCAL_BRIEF) {
         const localBrief = await getDailyBriefLocal(day, sqliteRepository);
         const uiBrief = mapLocalBriefToUiShape(localBrief);
+        console.log("Loaded brief from local DB", { day, localBrief, uiBrief });
+
+        console.log("Mapping local brief to UI shape:");
+      console.log("Raw local brief:", JSON.stringify(localBrief, null, 2));
+      console.log("Extracted uiBrief:", JSON.stringify(uiBrief, null, 2));
         setBrief(uiBrief);
         return;
       }
@@ -599,17 +604,19 @@ const renderGlobalDatePanel = () => (
                     </>
                   )}
 
-                {Array.isArray(reflection?.guidance) &&
-                  reflection.guidance.length > 0 && (
-                    <>
-                      <Text style={styles.label}>Guidance</Text>
-                      {reflection.guidance.map((g, i) => (
-                        <Text key={i} style={styles.listItem}>
-                          → {g}
-                        </Text>
-                      ))}
-                    </>
-                  )}
+                  {Array.isArray(debug?.guidance) && debug.guidance.length > 0 && (
+                      <>
+                        <Text style={styles.label}>Guidance items</Text>
+                        {debug.guidance.map((item, index) => (
+                          <View key={index} style={styles.debugItem}>
+                            <Text style={styles.debugItemTitle}>
+                              {item.title} · {item.priority}
+                            </Text>
+                            <Text style={styles.value}>{item.message}</Text>
+                          </View>
+                        ))}
+                      </>
+                    )}
 
                 {Array.isArray(debug?.findings) && debug.findings.length > 0 && (
                   <>
