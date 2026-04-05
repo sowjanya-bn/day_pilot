@@ -18,6 +18,13 @@ import { sqliteRepository } from "./src/local/storage/sqliteRepository";
 import { mapLocalBriefToUiShape } from "./src/local/brief/mapLocalBriefToUiShape.ts";
 import { initDb, seedDb } from "./src/local/storage/sqlite.ts";
 
+import {
+  addTaskLocal,
+  updateTaskStatusLocal,
+  savePlanLocal,
+  saveCheckinLocal,
+} from "./src/local/storage/sqliteMutations.ts";
+
 const API_BASE_URL = "http://localhost:8000/api";
 const DEFAULT_DATE = "2026-03-30";
 
@@ -286,134 +293,131 @@ export default function App() {
   };
 
   const addTask = async () => {
-    try {
-      if (!newTask.trim()) return;
+  try {
+    if (!newTask.trim()) return;
 
-      setError(null);
+    setError(null);
 
-      await apiPost("/tasks", {
-        date: selectedDate,
+    await addTaskLocal({
+      date: selectedDate,
+      title: newTask.trim(),
+      category: "general",
+      source: "manual",
+    });
+
+    setNewTask("");
+    await loadBrief(selectedDate);
+  } catch (err) {
+    setError(
+      toAppErrorDetails(err, {
+        screen: "App",
+        action: "addTask",
+        selectedDate,
         title: newTask,
-        category: "general",
-        source: "manual",
-      });
-
-      setNewTask("");
-      await loadBrief(selectedDate);
-    } catch (err) {
-      setError(
-        toAppErrorDetails(err, {
-          screen: "App",
-          action: "addTask",
-          selectedDate,
-          title: newTask,
-        })
-      );
-    }
-  };
+      })
+    );
+  }
+};
 
   const toggleTaskStatus = async (taskId, nextStatus) => {
-    try {
-      setError(null);
+  try {
+    setError(null);
 
-      await apiPut(`/tasks/${taskId}/status`, {
-        status: nextStatus,
-      });
-
-      await loadBrief(selectedDate);
-    } catch (err) {
-      setError(
-        toAppErrorDetails(err, {
-          screen: "App",
-          action: "toggleTaskStatus",
-          taskId,
-          nextStatus,
-          selectedDate,
-        })
-      );
-    }
-  };
+    await updateTaskStatusLocal(taskId, nextStatus);
+    await loadBrief(selectedDate);
+  } catch (err) {
+    setError(
+      toAppErrorDetails(err, {
+        screen: "App",
+        action: "toggleTaskStatus",
+        taskId,
+        nextStatus,
+        selectedDate,
+      })
+    );
+  }
+};
 
   const submitPlan = async () => {
-    try {
-      setSubmittingPlan(true);
-      setError(null);
+  try {
+    setSubmittingPlan(true);
+    setError(null);
 
-      const payload = {
-        date: planDate,
-        agenda: agenda || null,
-        top_priorities: topPrioritiesText
-          .split("\n")
-          .map((item) => item.trim())
-          .filter(Boolean),
-        learning_goal: learningGoal || null,
-        job_goal: jobGoal || null,
-        social_goal: socialGoal || null,
-      };
+    const payload = {
+      date: planDate,
+      agenda: agenda || null,
+      top_priorities: topPrioritiesText
+        .split("\n")
+        .map((item) => item.trim())
+        .filter(Boolean),
+      learning_goal: learningGoal || null,
+      job_goal: jobGoal || null,
+      social_goal: socialGoal || null,
+    };
 
-      await apiPost("/planner", payload);
-      await changeDateAndLoad(planDate);
-      setScreen("brief");
-    } catch (err) {
-      setError(
-        toAppErrorDetails(err, {
-          screen: "App",
-          action: "submitPlan",
-          planDate,
-        })
-      );
-    } finally {
-      setSubmittingPlan(false);
-    }
-  };
+    await savePlanLocal(payload);
+    await changeDateAndLoad(planDate);
+    setScreen("brief");
+  } catch (err) {
+    setError(
+      toAppErrorDetails(err, {
+        screen: "App",
+        action: "submitPlan",
+        planDate,
+      })
+    );
+  } finally {
+    setSubmittingPlan(false);
+  }
+};
 
   const submitCheckin = async () => {
-    try {
-      setSubmittingCheckin(true);
-      setError(null);
+  try {
+    setSubmittingCheckin(true);
+    setError(null);
 
-      const completed = completedText
-        .split("\n")
-        .map((item) => item.trim())
-        .filter(Boolean);
+    const completed = completedText
+      .split("\n")
+      .map((item) => item.trim())
+      .filter(Boolean);
 
-      const incomplete = incompleteText
-        .split("\n")
-        .map((item) => item.trim())
-        .filter(Boolean);
+    const incomplete = incompleteText
+      .split("\n")
+      .map((item) => item.trim())
+      .filter(Boolean);
 
-      const blockers = blockersText
-        .split("\n")
-        .map((item) => item.trim())
-        .filter(Boolean);
+    const blockers = blockersText
+      .split("\n")
+      .map((item) => item.trim())
+      .filter(Boolean);
 
-      const payload = {
-        date: checkinDate,
-        completed,
-        incomplete,
-        blockers,
-        carry_forward: incomplete,
-        learned: learnedText || null,
-        small_win: smallWinText || null,
-        mood: mood || "steady",
-        notes: notes || null,
-      };
+    const payload = {
+      date: checkinDate,
+      completed,
+      incomplete,
+      blockers,
+      carry_forward: incomplete,
+      learned: learnedText || null,
+      small_win: smallWinText || null,
+      mood: mood || "steady",
+      notes: notes || null,
+    };
 
-      await apiPost("/checkin", payload);
-      await changeDateAndLoad(checkinDate);
-      setScreen("brief");
-    } catch (err) {
-      setError(
-        toAppErrorDetails(err, {
-          screen: "App",
-          action: "submitCheckin",
-          checkinDate,
-        })
-      );
-    } finally {
-      setSubmittingCheckin(false);
-    }
-  };
+    await saveCheckinLocal(payload);
+    await changeDateAndLoad(checkinDate);
+    setScreen("brief");
+  } catch (err) {
+    setError(
+      toAppErrorDetails(err, {
+        screen: "App",
+        action: "submitCheckin",
+        checkinDate,
+      })
+    );
+  } finally {
+    setSubmittingCheckin(false);
+  }
+};
 
   const guidance = brief?.guidance ?? {};
   const stats = brief?.stats ?? {};
