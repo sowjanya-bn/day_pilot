@@ -11,12 +11,7 @@
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
-    "assetBundlePatterns": [
-      "**/*"
-    ],
-    "plugins": [
-      "expo-sqlite",
-      "expo-asset"
-    ]
+    "assetBundlePatterns": ["**/*"],
+    "plugins": ["expo-sqlite", "expo-asset"]
   }
 }

@@ -1,4 +1,4 @@
-export type TaskStatus = "outstanding" | "completed";
+export type TaskStatus = 'outstanding' | 'completed';
 
 export interface Task {
   id: number;
@@ -43,7 +43,7 @@ export interface DailyContext {
   };
 }
 
-export type FindingSeverity = "low" | "medium" | "high";
+export type FindingSeverity = 'low' | 'medium' | 'high';
 
 export interface PatternFinding {
   type: string;
@@ -60,7 +60,7 @@ export interface Insight {
   message: string;
 }
 
-export type GuidancePriority = "low" | "medium" | "high";
+export type GuidancePriority = 'low' | 'medium' | 'high';
 
 export interface GuidanceItem {
   type: string;

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   SafeAreaView,
   ScrollView,
@@ -10,23 +10,23 @@ import {
   Pressable,
   KeyboardAvoidingView,
   Platform,
-} from "react-native";
-import * as Clipboard from "expo-clipboard";
+} from 'react-native';
+import * as Clipboard from 'expo-clipboard';
 
-import { getDailyBriefLocal } from "./src/local/brief/getDailyBriefLocal.ts";
-import { sqliteRepository } from "./src/local/storage/sqliteRepository";
-import { mapLocalBriefToUiShape } from "./src/local/brief/mapLocalBriefToUiShape.ts";
-import { initDb, seedDb } from "./src/local/storage/sqlite.ts";
+import { getDailyBriefLocal } from './src/local/brief/getDailyBriefLocal.ts';
+import { sqliteRepository } from './src/local/storage/sqliteRepository';
+import { mapLocalBriefToUiShape } from './src/local/brief/mapLocalBriefToUiShape.ts';
+import { initDb, seedDb } from './src/local/storage/sqlite.ts';
 
 import {
   addTaskLocal,
   updateTaskStatusLocal,
   savePlanLocal,
   saveCheckinLocal,
-} from "./src/local/storage/sqliteMutations.ts";
+} from './src/local/storage/sqliteMutations.ts';
 
-const API_BASE_URL = "http://localhost:8000/api";
-const DEFAULT_DATE = "2026-03-30";
+const API_BASE_URL = 'http://localhost:8000/api';
+const DEFAULT_DATE = '2026-03-30';
 
 function toAppErrorDetails(error, extra) {
   if (error instanceof Error) {
@@ -45,22 +45,22 @@ function toAppErrorDetails(error, extra) {
   }
 
   return {
-    name: "UnknownError",
-    message: typeof error === "string" ? error : JSON.stringify(error, null, 2),
+    name: 'UnknownError',
+    message: typeof error === 'string' ? error : JSON.stringify(error, null, 2),
     extra,
   };
 }
 
 function getErrorDisplayText(error) {
-  if (!error) return "";
+  if (!error) return '';
   return error.name ? `${error.name}: ${error.message}` : error.message;
 }
 
 async function apiPost(path, payload) {
   const response = await fetch(`${API_BASE_URL}${path}`, {
-    method: "POST",
+    method: 'POST',
     headers: {
-      "Content-Type": "application/json",
+      'Content-Type': 'application/json',
     },
     body: JSON.stringify(payload),
   });
@@ -75,9 +75,9 @@ async function apiPost(path, payload) {
 
 async function apiPut(path, payload) {
   const response = await fetch(`${API_BASE_URL}${path}`, {
-    method: "PUT",
+    method: 'PUT',
     headers: {
-      "Content-Type": "application/json",
+      'Content-Type': 'application/json',
     },
     body: JSON.stringify(payload),
   });
@@ -91,23 +91,32 @@ async function apiPut(path, payload) {
 }
 
 function shiftDate(isoDate, days) {
-  const [year, month, day] = isoDate.split("-").map(Number);
+  const [year, month, day] = isoDate.split('-').map(Number);
   const d = new Date(Date.UTC(year, month - 1, day));
   d.setUTCDate(d.getUTCDate() + days);
   return d.toISOString().slice(0, 10);
 }
 
+function sentenceCase(text) {
+  return text.charAt(0).toUpperCase() + text.slice(1).toLowerCase();
+}
+
+function capitalize(value) {
+  if (!value) return '';
+  return value.charAt(0).toUpperCase() + value.slice(1);
+}
+
 function getLocalIsoDate() {
   const now = new Date();
   const year = now.getFullYear();
-  const month = String(now.getMonth() + 1).padStart(2, "0");
-  const day = String(now.getDate()).padStart(2, "0");
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
 }
 
 function formatShortReflection(patterns) {
   if (!Array.isArray(patterns) || patterns.length === 0) {
-    return "No strong signals today.";
+    return 'No strong signals today.';
   }
 
   if (patterns.length === 1) {
@@ -123,32 +132,32 @@ export default function App() {
   const [brief, setBrief] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [screen, setScreen] = useState("brief");
+  const [screen, setScreen] = useState('brief');
 
   const [selectedDate, setSelectedDate] = useState(DEFAULT_DATE);
 
   const [planDate, setPlanDate] = useState(DEFAULT_DATE);
-  const [agenda, setAgenda] = useState("");
-  const [topPrioritiesText, setTopPrioritiesText] = useState("");
-  const [learningGoal, setLearningGoal] = useState("");
-  const [jobGoal, setJobGoal] = useState("");
-  const [socialGoal, setSocialGoal] = useState("");
+  const [agenda, setAgenda] = useState('');
+  const [topPrioritiesText, setTopPrioritiesText] = useState('');
+  const [learningGoal, setLearningGoal] = useState('');
+  const [jobGoal, setJobGoal] = useState('');
+  const [socialGoal, setSocialGoal] = useState('');
   const [submittingPlan, setSubmittingPlan] = useState(false);
 
   const [checkinDate, setCheckinDate] = useState(DEFAULT_DATE);
-  const [completedText, setCompletedText] = useState("");
-  const [incompleteText, setIncompleteText] = useState("");
-  const [blockersText, setBlockersText] = useState("");
-  const [learnedText, setLearnedText] = useState("");
-  const [smallWinText, setSmallWinText] = useState("");
-  const [mood, setMood] = useState("steady");
-  const [notes, setNotes] = useState("");
+  const [completedText, setCompletedText] = useState('');
+  const [incompleteText, setIncompleteText] = useState('');
+  const [blockersText, setBlockersText] = useState('');
+  const [learnedText, setLearnedText] = useState('');
+  const [smallWinText, setSmallWinText] = useState('');
+  const [mood, setMood] = useState('steady');
+  const [notes, setNotes] = useState('');
   const [submittingCheckin, setSubmittingCheckin] = useState(false);
 
-  const [voiceTranscript, setVoiceTranscript] = useState("");
+  const [voiceTranscript, setVoiceTranscript] = useState('');
   const [generatingDraft, setGeneratingDraft] = useState(false);
 
-  const [newTask, setNewTask] = useState("");
+  const [newTask, setNewTask] = useState('');
 
   const [showReflectionDetails, setShowReflectionDetails] = useState(false);
   const [showDebug, setShowDebug] = useState(false);
@@ -162,11 +171,11 @@ export default function App() {
       if (USE_LOCAL_BRIEF) {
         const localBrief = await getDailyBriefLocal(day, sqliteRepository);
         const uiBrief = mapLocalBriefToUiShape(localBrief);
-        console.log("Loaded brief from local DB", { day, localBrief, uiBrief });
-
-        console.log("Mapping local brief to UI shape:");
-      console.log("Raw local brief:", JSON.stringify(localBrief, null, 2));
-      console.log("Extracted uiBrief:", JSON.stringify(uiBrief, null, 2));
+        //        console.log("Loaded brief from local DB", { day, localBrief, uiBrief });
+        //
+        //        console.log("Mapping local brief to UI shape:");
+        //      console.log("Raw local brief:", JSON.stringify(localBrief, null, 2));
+        //      console.log("Extracted uiBrief:", JSON.stringify(uiBrief, null, 2));
         setBrief(uiBrief);
         return;
       }
@@ -180,13 +189,13 @@ export default function App() {
       setBrief(data);
     } catch (err) {
       const details = toAppErrorDetails(err, {
-        screen: "App",
-        action: "loadBrief",
+        screen: 'App',
+        action: 'loadBrief',
         day,
         selectedDate,
       });
 
-      console.error("Daily brief load failed", details);
+      console.error('Daily brief load failed', details);
       setBrief(null);
       setError(details);
     } finally {
@@ -205,13 +214,13 @@ export default function App() {
       try {
         await initDb();
         await seedDb();
-        console.log("DB initialized");
+        console.log('DB initialized');
       } catch (err) {
         const details = toAppErrorDetails(err, {
-          screen: "App",
-          action: "setup",
+          screen: 'App',
+          action: 'setup',
         });
-        console.error("DB init failed", details);
+        console.error('DB init failed', details);
         setError(details);
       }
     }
@@ -238,9 +247,9 @@ export default function App() {
     } catch (err) {
       setError(
         toAppErrorDetails(err, {
-          screen: "App",
-          action: "pasteTranscriptFromClipboard",
-        })
+          screen: 'App',
+          action: 'pasteTranscriptFromClipboard',
+        }),
       );
     }
   };
@@ -275,22 +284,22 @@ export default function App() {
         transcript: voiceTranscript,
       };
 
-      const draft = await apiPost("/checkin/voice-draft", payload);
+      const draft = await apiPost('/checkin/voice-draft', payload);
 
-      setCompletedText((draft.completed || []).join("\n"));
-      setIncompleteText((draft.incomplete || []).join("\n"));
-      setBlockersText((draft.blockers || []).join("\n"));
-      setLearnedText(draft.learned || "");
-      setSmallWinText(draft.small_win || "");
-      setMood(draft.mood || "steady");
-      setNotes(draft.notes || "");
+      setCompletedText((draft.completed || []).join('\n'));
+      setIncompleteText((draft.incomplete || []).join('\n'));
+      setBlockersText((draft.blockers || []).join('\n'));
+      setLearnedText(draft.learned || '');
+      setSmallWinText(draft.small_win || '');
+      setMood(draft.mood || 'steady');
+      setNotes(draft.notes || '');
     } catch (err) {
       setError(
         toAppErrorDetails(err, {
-          screen: "App",
-          action: "generateCheckinDraft",
+          screen: 'App',
+          action: 'generateCheckinDraft',
           checkinDate,
-        })
+        }),
       );
     } finally {
       setGeneratingDraft(false);
@@ -298,131 +307,131 @@ export default function App() {
   };
 
   const addTask = async () => {
-  try {
-    if (!newTask.trim()) return;
+    try {
+      if (!newTask.trim()) return;
 
-    setError(null);
+      setError(null);
 
-    await addTaskLocal({
-      date: selectedDate,
-      title: newTask.trim(),
-      category: "general",
-      source: "manual",
-    });
+      await addTaskLocal({
+        date: selectedDate,
+        title: newTask.trim(),
+        category: 'general',
+        source: 'manual',
+      });
 
-    setNewTask("");
-    await loadBrief(selectedDate);
-  } catch (err) {
-    setError(
-      toAppErrorDetails(err, {
-        screen: "App",
-        action: "addTask",
-        selectedDate,
-        title: newTask,
-      })
-    );
-  }
-};
+      setNewTask('');
+      await loadBrief(selectedDate);
+    } catch (err) {
+      setError(
+        toAppErrorDetails(err, {
+          screen: 'App',
+          action: 'addTask',
+          selectedDate,
+          title: newTask,
+        }),
+      );
+    }
+  };
 
   const toggleTaskStatus = async (taskId, nextStatus) => {
-  try {
-    setError(null);
+    try {
+      setError(null);
 
-    await updateTaskStatusLocal(taskId, nextStatus);
-    await loadBrief(selectedDate);
-  } catch (err) {
-    setError(
-      toAppErrorDetails(err, {
-        screen: "App",
-        action: "toggleTaskStatus",
-        taskId,
-        nextStatus,
-        selectedDate,
-      })
-    );
-  }
-};
+      await updateTaskStatusLocal(taskId, nextStatus);
+      await loadBrief(selectedDate);
+    } catch (err) {
+      setError(
+        toAppErrorDetails(err, {
+          screen: 'App',
+          action: 'toggleTaskStatus',
+          taskId,
+          nextStatus,
+          selectedDate,
+        }),
+      );
+    }
+  };
 
   const submitPlan = async () => {
-  try {
-    setSubmittingPlan(true);
-    setError(null);
+    try {
+      setSubmittingPlan(true);
+      setError(null);
 
-    const payload = {
-      date: planDate,
-      agenda: agenda || null,
-      top_priorities: topPrioritiesText
-        .split("\n")
-        .map((item) => item.trim())
-        .filter(Boolean),
-      learning_goal: learningGoal || null,
-      job_goal: jobGoal || null,
-      social_goal: socialGoal || null,
-    };
+      const payload = {
+        date: planDate,
+        agenda: agenda || null,
+        top_priorities: topPrioritiesText
+          .split('\n')
+          .map((item) => item.trim())
+          .filter(Boolean),
+        learning_goal: learningGoal || null,
+        job_goal: jobGoal || null,
+        social_goal: socialGoal || null,
+      };
 
-    await savePlanLocal(payload);
-    await changeDateAndLoad(planDate);
-    setScreen("brief");
-  } catch (err) {
-    setError(
-      toAppErrorDetails(err, {
-        screen: "App",
-        action: "submitPlan",
-        planDate,
-      })
-    );
-  } finally {
-    setSubmittingPlan(false);
-  }
-};
+      await savePlanLocal(payload);
+      await changeDateAndLoad(planDate);
+      setScreen('brief');
+    } catch (err) {
+      setError(
+        toAppErrorDetails(err, {
+          screen: 'App',
+          action: 'submitPlan',
+          planDate,
+        }),
+      );
+    } finally {
+      setSubmittingPlan(false);
+    }
+  };
 
   const submitCheckin = async () => {
-  try {
-    setSubmittingCheckin(true);
-    setError(null);
+    try {
+      setSubmittingCheckin(true);
+      setError(null);
 
-    const completed = completedText
-      .split("\n")
-      .map((item) => item.trim())
-      .filter(Boolean);
+      const completed = completedText
+        .split('\n')
+        .map((item) => item.trim())
+        .filter(Boolean);
 
-    const incomplete = incompleteText
-      .split("\n")
-      .map((item) => item.trim())
-      .filter(Boolean);
+      const incomplete = incompleteText
+        .split('\n')
+        .map((item) => item.trim())
+        .filter(Boolean);
 
-    const blockers = blockersText
-      .split("\n")
-      .map((item) => item.trim())
-      .filter(Boolean);
+      const blockers = blockersText
+        .split('\n')
+        .map((item) => item.trim())
+        .filter(Boolean);
 
-    const payload = {
-      date: checkinDate,
-      completed,
-      incomplete,
-      blockers,
-      carry_forward: incomplete,
-      learned: learnedText || null,
-      small_win: smallWinText || null,
-      mood: mood || "steady",
-      notes: notes || null,
-    };
+      const payload = {
+        date: checkinDate,
+        completed,
+        incomplete,
+        blockers,
+        carry_forward: incomplete,
+        learned: learnedText || null,
+        small_win: smallWinText || null,
+        mood: mood || 'steady',
+        notes: notes || null,
+      };
 
-    await saveCheckinLocal(payload);
-    await changeDateAndLoad(checkinDate);
-    setScreen("brief");
-  } catch (err) {
-    setError(
-      toAppErrorDetails(err, {
-        screen: "App",
-        action: "submitCheckin",
-        checkinDate,
-      })
-    );
-  } finally {
-    setSubmittingCheckin(false);
-  }
-};
+      await saveCheckinLocal(payload);
+      await changeDateAndLoad(checkinDate);
+      setScreen('brief');
+    } catch (err) {
+      setError(
+        toAppErrorDetails(err, {
+          screen: 'App',
+          action: 'submitCheckin',
+          checkinDate,
+        }),
+      );
+    } finally {
+      setSubmittingCheckin(false);
+    }
+  };
 
   const guidance = brief?.guidance ?? {};
   const stats = brief?.stats ?? {};
@@ -437,46 +446,47 @@ export default function App() {
     return carryForward;
   }, [guidance]);
 
-const renderGlobalDatePanel = () => (
-  <View style={styles.dateToolbar}>
-    <TextInput
-      value={dateDraft}
-      onChangeText={setDateDraft}
-      onSubmitEditing={submitTypedDate}
-      style={styles.dateToolbarInput}
-      placeholder="YYYY-MM-DD"
-      autoCapitalize="none"
-      autoCorrect={false}
-    />
+  const renderGlobalDatePanel = () => (
+    <View style={styles.dateToolbar}>
+      <TextInput
+        value={dateDraft}
+        onChangeText={setDateDraft}
+        onSubmitEditing={submitTypedDate}
+        style={styles.dateToolbarInput}
+        placeholder="YYYY-MM-DD"
+        autoCapitalize="none"
+        autoCorrect={false}
+      />
 
-    <Pressable style={styles.dateToolbarButton} onPress={goToPreviousDay}>
-      <Text style={styles.dateToolbarButtonText}>← Prev</Text>
-    </Pressable>
+      <Pressable style={styles.dateToolbarButton} onPress={goToPreviousDay}>
+        <Text style={styles.dateToolbarButtonText}>← Prev</Text>
+      </Pressable>
 
-    <Pressable style={styles.dateToolbarButton} onPress={goToToday}>
-      <Text style={styles.dateToolbarButtonText}>Today</Text>
-    </Pressable>
+      <Pressable style={styles.dateToolbarButton} onPress={goToToday}>
+        <Text style={styles.dateToolbarButtonText}>Today</Text>
+      </Pressable>
 
-    <Pressable style={styles.dateToolbarButton} onPress={goToNextDay}>
-      <Text style={styles.dateToolbarButtonText}>Next →</Text>
-    </Pressable>
-  </View>
-);
+      <Pressable style={styles.dateToolbarButton} onPress={goToNextDay}>
+        <Text style={styles.dateToolbarButtonText}>Next →</Text>
+      </Pressable>
+    </View>
+  );
 
   const renderBrief = () => {
     const shortPatterns = Array.isArray(reflection?.patterns)
       ? reflection.patterns
       : [];
-    const nextSteps = Array.isArray(reflection?.guidance) ? reflection.guidance : [];
+    const nextSteps = Array.isArray(reflection?.guidance)
+      ? reflection.guidance
+      : [];
 
-    const hasMoreReflection =
-              shortPatterns.length > 1 || nextSteps.length > 1;
+    const hasMoreReflection = shortPatterns.length > 1 || nextSteps.length > 1;
 
     return (
       <>
         <Card title="Today" style={styles.todayCard}>
           <Text style={styles.focusText}>
-            {guidance?.focus_message || "No guidance yet."}
+            {guidance?.focus_message || 'No guidance yet.'}
           </Text>
 
           <View style={styles.statChipsRow}>
@@ -494,74 +504,86 @@ const renderGlobalDatePanel = () => (
 
           <Text style={styles.label}>Learning</Text>
           <Text style={styles.value}>
-            {guidance?.suggested_learning_next_step || "—"}
+            {guidance?.suggested_learning_next_step || '—'}
           </Text>
 
           <Text style={styles.label}>Job</Text>
           <Text style={styles.value}>
-            {guidance?.suggested_job_nudge || "—"}
+            {guidance?.suggested_job_nudge || '—'}
           </Text>
 
           <Text style={styles.label}>Social</Text>
           <Text style={styles.value}>
-            {guidance?.suggested_social_nudge || "—"}
+            {guidance?.suggested_social_nudge || '—'}
           </Text>
         </Card>
 
         {shortPatterns.length > 0 || reflection?.insight ? (
           <Card title="Reflection">
-            <Text style={styles.label}>What stood out</Text>
-            <Text style={styles.value}>
-              {formatShortReflection(shortPatterns)}
-            </Text>
-
+            {/* Insight */}
             {reflection?.insight ? (
               <>
-                <Text style={styles.label}>What this may mean</Text>
-                <Text numberOfLines={showReflectionDetails ? undefined : 4} style={styles.value}>
+                <Text style={styles.label}>Insight</Text>
+                <Text
+                  numberOfLines={showReflectionDetails ? undefined : 4}
+                  style={styles.value}
+                >
                   {reflection.insight}
                 </Text>
               </>
             ) : null}
 
-            {nextSteps.length > 0 ? (
+            {/* Patterns (short) */}
+            {shortPatterns.length > 0 && (
               <>
-                <Text style={styles.label}>Suggested next step</Text>
+                <Text style={styles.label}>Patterns</Text>
+                <Text style={styles.value}>
+                  {formatShortReflection(shortPatterns)}
+                </Text>
+              </>
+            )}
+
+            {/* Next step */}
+            {nextSteps.length > 0 && (
+              <>
+                <Text style={styles.label}>Next step</Text>
                 <Text style={styles.value}>{nextSteps[0]}</Text>
               </>
-            ) : null}
+            )}
 
-
-
+            {/* Toggle */}
             {hasMoreReflection && (
               <Pressable
                 style={styles.inlineToggle}
                 onPress={() => setShowReflectionDetails((prev) => !prev)}
               >
                 <Text style={styles.inlineToggleText}>
-                  {showReflectionDetails ? "Show less" : "Show more"}
+                  {showReflectionDetails ? 'Show less' : 'Show more'}
                 </Text>
               </Pressable>
             )}
 
+            {/* Expanded */}
             {showReflectionDetails && (
               <View style={styles.expandedSection}>
+                {/* All patterns */}
                 {shortPatterns.length > 0 && (
                   <>
-                    <Text style={styles.label}>All signals</Text>
+                    <Text style={styles.label}>All patterns</Text>
                     {shortPatterns.map((p, i) => (
-                      <Text key={i} style={styles.listItem}>
+                      <Text key={`pattern-${i}`} style={styles.listItem}>
                         • {p}
                       </Text>
                     ))}
                   </>
                 )}
 
+                {/* Additional steps */}
                 {nextSteps.length > 1 && (
                   <>
                     <Text style={styles.label}>More options</Text>
                     {nextSteps.slice(1).map((g, i) => (
-                      <Text key={i} style={styles.listItem}>
+                      <Text key={`step-${i}`} style={styles.listItem}>
                         • {g}
                       </Text>
                     ))}
@@ -579,67 +601,75 @@ const renderGlobalDatePanel = () => (
               onPress={() => setShowDebug((prev) => !prev)}
             >
               <Text style={styles.inlineToggleText}>
-                {showDebug ? "Hide debug details" : "Show debug details"}
+                {showDebug ? 'Hide debug details' : 'Show debug details'}
               </Text>
             </Pressable>
 
             {showDebug && (
               <View style={styles.expandedSection}>
-                {reflection?.insight ? (
-                  <>
-                    <Text style={styles.label}>Reflection insight</Text>
-                    <Text style={styles.value}>{reflection.insight}</Text>
-                  </>
-                ) : null}
-
                 {Array.isArray(reflection?.patterns) &&
                   reflection.patterns.length > 0 && (
                     <>
                       <Text style={styles.label}>Patterns</Text>
                       {reflection.patterns.map((p, i) => (
                         <Text key={i} style={styles.listItem}>
-                          • {p}
+                          • {sentenceCase(p)}
                         </Text>
                       ))}
                     </>
                   )}
 
-                  {Array.isArray(debug?.guidance) && debug.guidance.length > 0 && (
-                      <>
-                        <Text style={styles.label}>Guidance items</Text>
-                        {debug.guidance.map((item, index) => (
-                          <View key={index} style={styles.debugItem}>
-                            <Text style={styles.debugItemTitle}>
-                              {item.title} · {item.priority}
-                            </Text>
-                            <Text style={styles.value}>{item.message}</Text>
-                          </View>
-                        ))}
-                      </>
-                    )}
+                {Array.isArray(debug?.guidance) &&
+                  debug.guidance.length > 0 && (
+                    <>
+                      <Text style={styles.label}>Guidance</Text>
+                      {debug.guidance.map((item, index) => (
+                        <View style={styles.debugItem}>
+                          <Text style={styles.debugItemTitle}>
+                            {item.title}
+                          </Text>
+                          <Text style={styles.debugItemMeta}>
+                            {item.priority}
+                          </Text>
+                          <Text style={styles.value}>{item.message}</Text>
+                        </View>
+                      ))}
+                    </>
+                  )}
 
-                {Array.isArray(debug?.findings) && debug.findings.length > 0 && (
-                  <>
-                    <Text style={styles.label}>Findings</Text>
-                    {debug.findings.map((finding, index) => (
-                      <Text key={index} style={styles.listItem}>
-                        • {finding.type} ({finding.severity}) —{" "}
-                        {Math.round((finding.confidence ?? 0) * 100)}%
-                      </Text>
-                    ))}
-                  </>
-                )}
+                {Array.isArray(debug?.findings) &&
+                  debug.findings.length > 0 && (
+                    <>
+                      <Text style={styles.label}>Findings</Text>
+                      {debug.findings.map((finding, index) => (
+                        <Text
+                          style={[
+                            styles.listItem,
+                            styles[`severity${capitalize(finding.severity)}`],
+                          ]}
+                        >
+                          • {finding.type.replace('_', ' ')}
+                          <Text style={styles.meta}>
+                            {' '}
+                            · {finding.severity.toUpperCase()} ·{' '}
+                            {Math.round(finding.confidence * 100)}%
+                          </Text>
+                        </Text>
+                      ))}
+                    </>
+                  )}
 
-                {Array.isArray(debug?.insights) && debug.insights.length > 0 && (
-                  <>
-                    <Text style={styles.label}>Insights</Text>
-                    {debug.insights.map((insight, index) => (
-                      <Text key={index} style={styles.listItem}>
-                        • {insight.message}
-                      </Text>
-                    ))}
-                  </>
-                )}
+                {Array.isArray(debug?.insights) &&
+                  debug.insights.length > 0 && (
+                    <>
+                      <Text style={styles.label}>Insights</Text>
+                      {debug.insights.map((insight, index) => (
+                        <Text key={index} style={styles.listItem}>
+                          • {insight.message}
+                        </Text>
+                      ))}
+                    </>
+                  )}
               </View>
             )}
           </Card>
@@ -653,7 +683,8 @@ const renderGlobalDatePanel = () => (
       {staleTaskTitles.length > 0 && (
         <Card title="Needs attention">
           <Text style={styles.value}>
-            These tasks have been carried forward and probably deserve a proper reset.
+            These tasks have been carried forward and probably deserve a proper
+            reset.
           </Text>
 
           <View style={styles.compactList}>
@@ -691,7 +722,7 @@ const renderGlobalDatePanel = () => (
               </View>
               <Pressable
                 style={styles.taskActionButton}
-                onPress={() => toggleTaskStatus(task.id, "completed")}
+                onPress={() => toggleTaskStatus(task.id, 'completed')}
               >
                 <Text style={styles.taskActionButtonText}>Done</Text>
               </Pressable>
@@ -714,7 +745,7 @@ const renderGlobalDatePanel = () => (
               </View>
               <Pressable
                 style={styles.taskUndoButton}
-                onPress={() => toggleTaskStatus(task.id, "outstanding")}
+                onPress={() => toggleTaskStatus(task.id, 'outstanding')}
               >
                 <Text style={styles.taskUndoButtonText}>Undo</Text>
               </Pressable>
@@ -735,7 +766,7 @@ const renderGlobalDatePanel = () => (
         disabled={submittingPlan}
       >
         <Text style={styles.primaryButtonText}>
-          {submittingPlan ? "Saving..." : "Save plan"}
+          {submittingPlan ? 'Saving...' : 'Save plan'}
         </Text>
       </Pressable>
 
@@ -763,7 +794,7 @@ const renderGlobalDatePanel = () => (
           value={topPrioritiesText}
           onChangeText={setTopPrioritiesText}
           style={[styles.input, styles.textArea]}
-          placeholder={"Finish coursework\nApply to one role\nGo for a walk"}
+          placeholder={'Finish coursework\nApply to one role\nGo for a walk'}
           multiline
         />
       </FormField>
@@ -801,7 +832,7 @@ const renderGlobalDatePanel = () => (
         disabled={submittingPlan}
       >
         <Text style={styles.primaryButtonText}>
-          {submittingPlan ? "Saving..." : "Save plan"}
+          {submittingPlan ? 'Saving...' : 'Save plan'}
         </Text>
       </Pressable>
     </Card>
@@ -815,7 +846,7 @@ const renderGlobalDatePanel = () => (
         disabled={submittingCheckin}
       >
         <Text style={styles.primaryButtonText}>
-          {submittingCheckin ? "Saving..." : "Save check-in"}
+          {submittingCheckin ? 'Saving...' : 'Save check-in'}
         </Text>
       </Pressable>
 
@@ -844,7 +875,9 @@ const renderGlobalDatePanel = () => (
         disabled={generatingDraft || !voiceTranscript.trim()}
       >
         <Text style={styles.secondaryButtonText}>
-          {generatingDraft ? "Generating draft..." : "Generate draft from transcript"}
+          {generatingDraft
+            ? 'Generating draft...'
+            : 'Generate draft from transcript'}
         </Text>
       </Pressable>
 
@@ -925,7 +958,7 @@ const renderGlobalDatePanel = () => (
         disabled={submittingCheckin}
       >
         <Text style={styles.primaryButtonText}>
-          {submittingCheckin ? "Saving..." : "Save check-in"}
+          {submittingCheckin ? 'Saving...' : 'Save check-in'}
         </Text>
       </Pressable>
     </Card>
@@ -959,7 +992,9 @@ const renderGlobalDatePanel = () => (
           {error.cause ? (
             <>
               <Text style={styles.debugTitle}>Cause</Text>
-              <Text selectable style={styles.debugText}>{error.cause}</Text>
+              <Text selectable style={styles.debugText}>
+                {error.cause}
+              </Text>
             </>
           ) : null}
 
@@ -987,7 +1022,7 @@ const renderGlobalDatePanel = () => (
     <SafeAreaView style={styles.container}>
       <KeyboardAvoidingView
         style={styles.container}
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         keyboardVerticalOffset={20}
       >
         <ScrollView
@@ -1002,23 +1037,23 @@ const renderGlobalDatePanel = () => (
           <View style={styles.navRow}>
             <NavButton
               label="Brief"
-              active={screen === "brief"}
-              onPress={() => setScreen("brief")}
+              active={screen === 'brief'}
+              onPress={() => setScreen('brief')}
             />
             <NavButton
               label="Plan"
-              active={screen === "plan"}
-              onPress={() => setScreen("plan")}
+              active={screen === 'plan'}
+              onPress={() => setScreen('plan')}
             />
             <NavButton
               label="Check-in"
-              active={screen === "checkin"}
-              onPress={() => setScreen("checkin")}
+              active={screen === 'checkin'}
+              onPress={() => setScreen('checkin')}
             />
             <NavButton
               label="Tasks"
-              active={screen === "tasks"}
-              onPress={() => setScreen("tasks")}
+              active={screen === 'tasks'}
+              onPress={() => setScreen('tasks')}
             />
           </View>
 
@@ -1026,10 +1061,10 @@ const renderGlobalDatePanel = () => (
             <Text style={styles.inlineError}>{getErrorDisplayText(error)}</Text>
           ) : null}
 
-          {screen === "brief" && renderBrief()}
-          {screen === "plan" && renderPlanForm()}
-          {screen === "checkin" && renderCheckinForm()}
-          {screen === "tasks" && renderTasks()}
+          {screen === 'brief' && renderBrief()}
+          {screen === 'plan' && renderPlanForm()}
+          {screen === 'checkin' && renderCheckinForm()}
+          {screen === 'tasks' && renderTasks()}
 
           <Pressable
             style={styles.secondaryButton}
@@ -1067,7 +1102,9 @@ function NavButton({ label, active, onPress }) {
       onPress={onPress}
       style={[styles.navButton, active && styles.navButtonActive]}
     >
-      <Text style={[styles.navButtonText, active && styles.navButtonTextActive]}>
+      <Text
+        style={[styles.navButtonText, active && styles.navButtonTextActive]}
+      >
         {label}
       </Text>
     </Pressable>
@@ -1086,7 +1123,7 @@ function StatChip({ label, value }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#f6f7fb",
+    backgroundColor: '#f6f7fb',
   },
   content: {
     padding: 20,
@@ -1095,63 +1132,63 @@ const styles = StyleSheet.create({
   },
   centered: {
     flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
+    justifyContent: 'center',
+    alignItems: 'center',
     padding: 24,
   },
   errorContainer: {
     padding: 24,
     flexGrow: 1,
-    justifyContent: "center",
+    justifyContent: 'center',
   },
   title: {
     fontSize: 28,
-    fontWeight: "700",
+    fontWeight: '700',
   },
   subtitle: {
     fontSize: 16,
-    color: "#666",
+    color: '#666',
     marginBottom: 8,
   },
   navRow: {
-      flexDirection: "row",
-      gap: 8,
-      marginBottom: 8, // slightly tighter grouping
-      flexWrap: "wrap",
-    },
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 8, // slightly tighter grouping
+    flexWrap: 'wrap',
+  },
   navButton: {
     paddingVertical: 10,
     paddingHorizontal: 14,
     borderRadius: 999,
-    backgroundColor: "#e9e9ee",
+    backgroundColor: '#e9e9ee',
   },
   navButtonActive: {
-    backgroundColor: "#111",
+    backgroundColor: '#111',
   },
   navButtonText: {
-    color: "#333",
-    fontWeight: "600",
+    color: '#333',
+    fontWeight: '600',
   },
   navButtonTextActive: {
-    color: "#fff",
+    color: '#fff',
   },
   card: {
-      backgroundColor: "#f8f9fb",
-      borderRadius: 16,
-      padding: 14, // was 16
-      shadowColor: "#000",
-      shadowOpacity: 0.04,
-      shadowRadius: 10,
-      shadowOffset: { width: 0, height: 3 },
-      elevation: 2,
-    },
-    todayCard: {
-      backgroundColor: "white",
-      shadowOpacity: 0.06,
-    },
+    backgroundColor: '#f8f9fb',
+    borderRadius: 16,
+    padding: 14, // was 16
+    shadowColor: '#000',
+    shadowOpacity: 0.04,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 2,
+  },
+  todayCard: {
+    backgroundColor: 'white',
+    shadowOpacity: 0.06,
+  },
   cardTitle: {
     fontSize: 18,
-    fontWeight: "600",
+    fontWeight: '600',
     marginBottom: 10,
   },
   focusText: {
@@ -1162,85 +1199,86 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   label: {
-      fontSize: 13,
-      fontWeight: "600",
-      color: "#555", // instead of default black
-      marginTop: 8,
-      marginBottom: 4,
-    },
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#555', // instead of default black
+    marginTop: 8,
+    marginBottom: 4,
+  },
   value: {
     fontSize: 15,
     lineHeight: 22,
-    color: "#222",
+    color: '#222',
   },
   listItem: {
     fontSize: 15,
     lineHeight: 22,
     marginBottom: 4,
-    color: "#222",
+    color: '#222',
+    textTransform: 'capitalize',
   },
   compactList: {
     marginTop: 8,
   },
   muted: {
     fontSize: 14,
-    color: "#777",
+    color: '#777',
   },
   input: {
     borderWidth: 1,
-    borderColor: "#ddd",
+    borderColor: '#ddd',
     borderRadius: 12,
     paddingHorizontal: 12,
     paddingVertical: 10,
-    backgroundColor: "#fff",
+    backgroundColor: '#fff',
     fontSize: 15,
   },
   textArea: {
     minHeight: 64,
-    textAlignVertical: "top",
+    textAlignVertical: 'top',
   },
   largeTextArea: {
     minHeight: 120,
-    textAlignVertical: "top",
+    textAlignVertical: 'top',
   },
   primaryButton: {
     marginTop: 10,
-    backgroundColor: "#111",
+    backgroundColor: '#111',
     paddingVertical: 12,
     borderRadius: 12,
-    alignItems: "center",
+    alignItems: 'center',
   },
   primaryButtonText: {
-    color: "#fff",
-    fontWeight: "700",
+    color: '#fff',
+    fontWeight: '700',
     fontSize: 15,
   },
   secondaryButton: {
     marginTop: 8,
-    backgroundColor: "#e9e9ee",
+    backgroundColor: '#e9e9ee',
     paddingVertical: 14,
     borderRadius: 12,
-    alignItems: "center",
+    alignItems: 'center',
   },
   secondaryButtonText: {
-    color: "#111",
-    fontWeight: "700",
+    color: '#111',
+    fontWeight: '700',
     fontSize: 15,
   },
   helperText: {
     marginTop: 8,
-    color: "#666",
-    textAlign: "center",
+    color: '#666',
+    textAlign: 'center',
     fontSize: 15,
     lineHeight: 22,
   },
   errorText: {
     fontSize: 18,
-    fontWeight: "600",
-    color: "#b00020",
+    fontWeight: '600',
+    color: '#b00020',
   },
   inlineError: {
-    color: "#b00020",
+    color: '#b00020',
     fontSize: 14,
     marginBottom: 4,
   },
@@ -1248,66 +1286,66 @@ const styles = StyleSheet.create({
     marginTop: 20,
     marginBottom: 8,
     fontSize: 15,
-    fontWeight: "700",
-    color: "#111",
+    fontWeight: '700',
+    color: '#111',
   },
   debugText: {
     fontSize: 12,
     lineHeight: 18,
-    color: "#333",
+    color: '#333',
   },
   stackText: {
     fontSize: 12,
     lineHeight: 18,
-    color: "#333",
+    color: '#333',
     fontFamily: Platform.select({
-      ios: "Menlo",
-      android: "monospace",
-      default: "monospace",
+      ios: 'Menlo',
+      android: 'monospace',
+      default: 'monospace',
     }),
   },
   taskRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     gap: 12,
     paddingVertical: 8,
     borderBottomWidth: 1,
-    borderBottomColor: "#f0f0f0",
+    borderBottomColor: '#f0f0f0',
   },
   taskText: {
     flex: 1,
     fontSize: 15,
     lineHeight: 22,
-    color: "#222",
+    color: '#222',
   },
   completedTaskText: {
     flex: 1,
     fontSize: 15,
     lineHeight: 22,
-    color: "#777",
-    textDecorationLine: "line-through",
+    color: '#777',
+    textDecorationLine: 'line-through',
   },
   taskActionButton: {
-    backgroundColor: "#111",
+    backgroundColor: '#111',
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 10,
   },
   taskActionButtonText: {
-    color: "#fff",
-    fontWeight: "700",
+    color: '#fff',
+    fontWeight: '700',
     fontSize: 13,
   },
   taskUndoButton: {
-    backgroundColor: "#e9e9ee",
+    backgroundColor: '#e9e9ee',
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 10,
   },
   taskUndoButtonText: {
-    color: "#111",
-    fontWeight: "700",
+    color: '#111',
+    fontWeight: '700',
     fontSize: 13,
   },
   taskTextBlock: {
@@ -1315,86 +1353,117 @@ const styles = StyleSheet.create({
   },
   taskMeta: {
     fontSize: 12,
-    color: "#777",
+    color: '#777',
     marginTop: 2,
   },
   dateControls: {
-    flexDirection: "row",
-    justifyContent: "space-between",
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     gap: 8,
     marginTop: 10,
   },
   dateChip: {
     flex: 1,
-    backgroundColor: "#e9e9ee",
+    backgroundColor: '#e9e9ee',
     paddingVertical: 10,
     borderRadius: 10,
-    alignItems: "center",
+    alignItems: 'center',
   },
   dateChipText: {
-    color: "#111",
-    fontWeight: "600",
+    color: '#111',
+    fontWeight: '600',
     fontSize: 13,
   },
   statChipsRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
+    flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: 8,
     marginTop: 12,
     marginBottom: 8,
   },
   statChip: {
-    backgroundColor: "#f1f3f7",
+    backgroundColor: '#f1f3f7',
     borderRadius: 12,
     paddingVertical: 8,
     paddingHorizontal: 10,
   },
   statChipLabel: {
     fontSize: 12,
-    color: "#666",
+    color: '#666',
   },
   statChipValue: {
     fontSize: 16,
-    fontWeight: "700",
-    color: "#111",
+    fontWeight: '700',
+    color: '#111',
   },
   inlineToggle: {
     marginTop: 10,
-    alignSelf: "flex-start",
+    alignSelf: 'flex-start',
   },
   inlineToggleText: {
-    color: "#4f46e5",
+    color: '#4f46e5',
     fontSize: 14,
-    fontWeight: "600",
+    fontWeight: '600',
   },
   expandedSection: {
     marginTop: 8,
+    marginBottom: 16,
   },
   dateToolbar: {
-  flexDirection: "row",
-  alignItems: "center",
-  gap: 6,
-  marginBottom: 6, // was 2 or 4
-},
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 6, // was 2 or 4
+  },
 
-dateToolbarInput: {
-  flex: 1,
-  minWidth: 110,
-  borderWidth: 1,
-  borderColor: "#ddd",
-  borderRadius: 10,
-  paddingHorizontal: 12,
-  paddingVertical: 8,
-  backgroundColor: "#fff",
-  fontSize: 15,
-},
+  dateToolbarInput: {
+    flex: 1,
+    minWidth: 110,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: '#fff',
+    fontSize: 15,
+  },
 
-dateToolbarButton: {
-  backgroundColor: "#e9e9ee",
-  paddingHorizontal: 11,
-  paddingVertical: 9,
-  borderRadius: 10,
-  alignItems: "center",
-  justifyContent: "center",
-},
+  dateToolbarButton: {
+    backgroundColor: '#e9e9ee',
+    paddingHorizontal: 11,
+    paddingVertical: 9,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  debugItem: {
+    marginBottom: 14,
+  },
+
+  debugItemTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#222',
+  },
+
+  debugItemMeta: {
+    fontSize: 12,
+    color: '#888',
+    marginBottom: 4,
+    textTransform: 'uppercase',
+  },
+
+  section: {
+    marginBottom: 16,
+  },
+
+  meta: {
+    color: '#888',
+    fontSize: 13,
+  },
+
+  severityHigh: { color: '#222' },
+  severityMedium: { color: '#555' },
+  severityLow: { color: '#888' },
 });

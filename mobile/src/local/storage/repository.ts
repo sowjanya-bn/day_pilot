@@ -1,4 +1,4 @@
-import type { DailyCheckin, Task, TomorrowPlan } from "../../domain/types.ts";
+import type { DailyCheckin, Task, TomorrowPlan } from '../../domain/types.ts';
 
 export interface DailyBriefRepository {
   getTasksForDate(date: string): Promise<Task[]>;

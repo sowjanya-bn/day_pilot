@@ -1,4 +1,4 @@
-import type { DailyContext, Task, WindowStats } from "../../domain/types.ts";
+import type { DailyContext, Task, WindowStats } from '../../domain/types.ts';
 
 function isoToDate(value: string): Date {
   return new Date(`${value}T00:00:00`);
@@ -15,7 +15,7 @@ function shiftDate(isoDate: string, days: number): string {
 }
 
 function isCompleted(task: Task): boolean {
-  return task.status === "completed" || !!task.completedAt;
+  return task.status === 'completed' || !!task.completedAt;
 }
 
 function wasCompletedOnDate(task: Task, isoDate: string): boolean {
@@ -26,10 +26,10 @@ function wasCompletedOnDate(task: Task, isoDate: string): boolean {
 function getTasksAssignedInWindow(
   tasks: Task[],
   startDate: string,
-  endDate: string
+  endDate: string,
 ): Task[] {
   return tasks.filter(
-    (task) => task.assignedDate >= startDate && task.assignedDate <= endDate
+    (task) => task.assignedDate >= startDate && task.assignedDate <= endDate,
   );
 }
 
@@ -59,7 +59,7 @@ function countByCategory(tasks: Task[]): Record<string, number> {
 
 export function collectDailyContext(
   analysisDate: string,
-  tasks: Task[]
+  tasks: Task[],
 ): DailyContext {
   const currentStartDate = shiftDate(analysisDate, -6);
   const previousEndDate = shiftDate(currentStartDate, -1);
@@ -67,21 +67,23 @@ export function collectDailyContext(
 
   const todayTasks = tasks.filter((task) => task.assignedDate === analysisDate);
   const openTasks = tasks.filter((task) => !isCompleted(task));
-  const staleTasks = openTasks.filter((task) => task.assignedDate < analysisDate);
+  const staleTasks = openTasks.filter(
+    (task) => task.assignedDate < analysisDate,
+  );
   const completedToday = tasks.filter((task) =>
-    wasCompletedOnDate(task, analysisDate)
+    wasCompletedOnDate(task, analysisDate),
   );
 
   const current7dTasks = getTasksAssignedInWindow(
     tasks,
     currentStartDate,
-    analysisDate
+    analysisDate,
   );
 
   const previous7dTasks = getTasksAssignedInWindow(
     tasks,
     previousStartDate,
-    previousEndDate
+    previousEndDate,
   );
 
   return {

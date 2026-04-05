@@ -1,14 +1,10 @@
-import type {
-  DailyContext,
-  Insight,
-  PatternFinding,
-} from "../domain/types.ts";
-import { detectOvercommitment } from "./detectors/detectOvercommitment.ts";
-import { detectCarryForward } from "./detectors/detectCarryForward.ts";
-import { detectBacklogPressure } from "./detectors/detectBacklogPressure.ts";
-import { processFindings } from "./processFindings.ts";
-import { generateGuidance } from "./guidance.ts";
-import { synthesizeInsights } from "./synthesizeInsights.ts";
+import type { DailyContext, Insight, PatternFinding } from '../domain/types.ts';
+import { detectOvercommitment } from './detectors/detectOvercommitment.ts';
+import { detectCarryForward } from './detectors/detectCarryForward.ts';
+import { detectBacklogPressure } from './detectors/detectBacklogPressure.ts';
+import { processFindings } from './processFindings.ts';
+import { generateGuidance } from './guidance.ts';
+import { synthesizeInsights } from './synthesizeInsights.ts';
 
 const detectors = [
   detectOvercommitment,
@@ -18,7 +14,7 @@ const detectors = [
 
 export function generateAgentReport(context: DailyContext): AgentReport {
   const rawFindings: PatternFinding[] = detectors.flatMap((detector) =>
-    detector(context)
+    detector(context),
   );
 
   const findings = processFindings(rawFindings);

@@ -1,10 +1,8 @@
-import type { DailyContext, PatternFinding } from "../../domain/types.ts";
+import type { DailyContext, PatternFinding } from '../../domain/types.ts';
 
 const MIN_PLANNED_COUNT = 3;
 
-export function detectBacklogPressure(
-  context: DailyContext
-): PatternFinding[] {
+export function detectBacklogPressure(context: DailyContext): PatternFinding[] {
   const current = context.windows.current7d.stats;
   const previous = context.windows.previous7d.stats;
 
@@ -25,21 +23,19 @@ export function detectBacklogPressure(
 
   const severity =
     openDelta >= 3 || current.openCount >= 4
-      ? "high"
+      ? 'high'
       : openDelta >= 2
-        ? "medium"
-        : "low";
+        ? 'medium'
+        : 'low';
 
   const confidence = Math.min(
-    0.68 +
-      openDelta * 0.08 +
-      (completionDelta <= 0 ? 0.08 : 0),
-    0.95
+    0.68 + openDelta * 0.08 + (completionDelta <= 0 ? 0.08 : 0),
+    0.95,
   );
 
   return [
     {
-      type: "backlog_pressure",
+      type: 'backlog_pressure',
       severity,
       confidence,
       summary:
@@ -62,7 +58,7 @@ export function detectBacklogPressure(
         openDelta,
         completionDelta,
       },
-      dedupeKey: "backlog_pressure",
+      dedupeKey: 'backlog_pressure',
     },
   ];
 }

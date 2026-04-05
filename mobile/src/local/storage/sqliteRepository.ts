@@ -1,12 +1,12 @@
-import type { DailyCheckin, Task, TomorrowPlan } from "../../domain/types.ts";
-import type { DailyBriefRepository } from "./repository.ts";
-import { getDb } from "./sqlite.ts";
+import type { DailyCheckin, Task, TomorrowPlan } from '../../domain/types.ts';
+import type { DailyBriefRepository } from './repository.ts';
+import { getDb } from './sqlite.ts';
 
 type TaskRow = {
   id: number;
   title: string;
   category: string;
-  status: "outstanding" | "completed";
+  status: 'outstanding' | 'completed';
   source: string;
   assigned_date: string;
   created_at: string;
@@ -93,7 +93,7 @@ export const sqliteRepository: DailyBriefRepository = {
     const db = await getDb();
     const rows = await db.getAllAsync<TaskRow>(
       `SELECT * FROM taskentity WHERE assigned_date = ? ORDER BY id`,
-      [date]
+      [date],
     );
     return rows.map(mapTask);
   },
@@ -104,7 +104,7 @@ export const sqliteRepository: DailyBriefRepository = {
       `SELECT * FROM taskentity
        WHERE assigned_date >= ? AND assigned_date <= ?
        ORDER BY assigned_date, id`,
-      [startDate, endDate]
+      [startDate, endDate],
     );
     return rows.map(mapTask);
   },
@@ -113,7 +113,7 @@ export const sqliteRepository: DailyBriefRepository = {
     const db = await getDb();
     const row = await db.getFirstAsync<PlanRow>(
       `SELECT * FROM tomorrowplanentity WHERE date = ?`,
-      [date]
+      [date],
     );
     return row ? mapPlan(row) : null;
   },
@@ -125,7 +125,7 @@ export const sqliteRepository: DailyBriefRepository = {
        WHERE date < ?
        ORDER BY date DESC
        LIMIT 1`,
-      [date]
+      [date],
     );
     return row ? mapCheckin(row) : null;
   },

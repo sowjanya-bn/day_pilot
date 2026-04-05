@@ -6,12 +6,14 @@ import type {
   DailyTaskList,
   Task,
   TomorrowPlan,
-} from "../../domain/types.ts";
-import { generateAgentReport } from "../agent/index.ts";
-import { collectDailyContext } from "../agent/collector.ts";
-import { mapAgentToBrief } from "./mapAgentToBrief.ts";
+} from '../../domain/types.ts';
+import { generateAgentReport } from '../agent/index.ts';
+import { collectDailyContext } from '../agent/collector.ts';
+import { mapAgentToBrief } from './mapAgentToBrief.ts';
 
-import type { DailyBriefRepository } from "../storage/repository.ts";
+import type { DailyBriefRepository } from '../storage/repository.ts';
+
+import { ollamaEnhancer } from '../llm/ollamaEnhancer.ts';
 
 function shiftDate(isoDate: string, days: number): string {
   const d = new Date(`${isoDate}T00:00:00`);
@@ -20,12 +22,14 @@ function shiftDate(isoDate: string, days: number): string {
 }
 
 function isCompleted(task: Task): boolean {
-  return task.status === "completed" || !!task.completedAt;
+  return task.status === 'completed' || !!task.completedAt;
 }
 
 function buildStats(date: string, tasksIn7d: Task[]): DailyStats {
   const completedTasksLast7Days = tasksIn7d.filter(isCompleted).length;
-  const incompleteTasksLast7Days = tasksIn7d.filter((task) => !isCompleted(task)).length;
+  const incompleteTasksLast7Days = tasksIn7d.filter(
+    (task) => !isCompleted(task),
+  ).length;
 
   return {
     date,
@@ -44,7 +48,10 @@ function buildTaskList(date: string, todaysTasks: Task[]): DailyTaskList {
   };
 }
 
-function buildCarryForwardGuidance(date: string, todaysTasks: Task[]): CarryForwardGuidance {
+function buildCarryForwardGuidance(
+  date: string,
+  todaysTasks: Task[],
+): CarryForwardGuidance {
   const carryForwardTasks = todaysTasks
     .filter((task) => !isCompleted(task))
     .map((task) => task.title);
@@ -52,49 +59,79 @@ function buildCarryForwardGuidance(date: string, todaysTasks: Task[]): CarryForw
   return {
     date,
     carryForwardTasks,
-    suggestedLearningNextStep: "Spend 20 minutes on your current learning goal.",
-    suggestedJobNudge: "Take one small job-search action today.",
-    suggestedSocialNudge: "Send one small message or start one light conversation.",
-    focusMessage: "Keep the day simple and move one important thing forward.",
+    suggestedLearningNextStep:
+      'Spend 20 minutes on your current learning goal.',
+    suggestedJobNudge: 'Take one small job-search action today.',
+    suggestedSocialNudge:
+      'Send one small message or start one light conversation.',
+    focusMessage: 'Keep the day simple and move one important thing forward.',
   };
 }
-export function buildGuidanceFromAgentAndTasks(
+
+import type { AgentReport, Task } from '../../domain/types.ts';
+import type { LLMEnhancer } from '../llm/enhancer.ts';
+
+export async function buildGuidanceFromAgentAndTasks(
   date: string,
   todaysTasks: Task[],
-  agentReport: AgentReport
+  agentReport: AgentReport,
+  enhancer?: LLMEnhancer,
 ) {
-  const topGuidance = agentReport.guidance[0];
+  const guidanceItems = agentReport.guidance ?? [];
+  const primary = guidanceItems[0];
+
   const carryForwardTasks = todaysTasks
-    .filter((task) => task.status === "outstanding")
+    .filter((task) => task.status === 'outstanding')
     .map((task) => task.title);
+
+  const fallbackMessage =
+    carryForwardTasks.length > 0
+      ? 'Focus on finishing one existing task before adding new work.'
+      : 'Keep the day simple and move one important thing forward.';
+
+  const baseMessage = primary?.message ?? fallbackMessage;
+
+  let enhancedMessage: string | null = null;
+
+  console.log('Agent Report Findings:', agentReport.findings);
+
+  if (enhancer && primary) {
+    console.log('Enhancing guidance message with LLM Enhancer...');
+    enhancedMessage = await enhancer.enhanceGuidance({
+      findings: agentReport.findings.map((f) => f.summary),
+      insight: agentReport.insights[0]?.message,
+      guidance: primary.message,
+    });
+  }
+
+  console.log('Enhanced Guidance Message:', enhancedMessage);
 
   return {
     date,
-    focusMessage:
-      topGuidance?.message ??
-      "Keep the day simple and move one important thing forward.",
+    focusMessage: enhancedMessage ?? baseMessage,
     suggestedLearningNextStep:
-      "Spend 20 minutes on your current learning goal.",
-    suggestedJobNudge:
-      "Take one small job-search action today.",
+      'Spend 20 minutes on your current learning goal.',
+    suggestedJobNudge: 'Take one small job-search action today.',
     suggestedSocialNudge:
-      "Send one small message or start one light conversation.",
+      'Send one small message or start one light conversation.',
     carryForwardTasks,
   };
 }
 
 export async function getDailyBriefLocal(
   date: string,
-  repository: DailyBriefRepository
+  repository: DailyBriefRepository,
 ): Promise<DailyBrief> {
   const windowStart = shiftDate(date, -6);
 
-  const [todaysTasks, tasksIn7d, plan, yesterdayReflection] = await Promise.all([
-    repository.getTasksForDate(date),
-    repository.getTasksInRange(windowStart, date),
-    repository.getPlanForDate(date),
-    repository.getLatestCheckinBefore(date),
-  ]);
+  const [todaysTasks, tasksIn7d, plan, yesterdayReflection] = await Promise.all(
+    [
+      repository.getTasksForDate(date),
+      repository.getTasksInRange(windowStart, date),
+      repository.getPlanForDate(date),
+      repository.getLatestCheckinBefore(date),
+    ],
+  );
 
   const stats = buildStats(date, tasksIn7d);
   const tasks = buildTaskList(date, todaysTasks);
@@ -102,12 +139,22 @@ export async function getDailyBriefLocal(
   const context = collectDailyContext(date, tasksIn7d);
   const agentReport = generateAgentReport(context);
 
-  const guidance = buildGuidanceFromAgentAndTasks(
+  //   const guidance = buildGuidanceFromAgentAndTasks(
+  //     date,
+  //     todaysTasks,
+  //     agentReport
+  //   );
+
+  const ENABLE_LLM = true;
+
+  const guidance = await buildGuidanceFromAgentAndTasks(
     date,
     todaysTasks,
-    agentReport
+    agentReport,
+    ENABLE_LLM ? ollamaEnhancer : undefined,
   );
 
+  console.log('Generated Guidance:', guidance);
   const reflection = mapAgentToBrief(agentReport);
 
   return {

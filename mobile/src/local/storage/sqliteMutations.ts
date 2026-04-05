@@ -1,4 +1,4 @@
-import { getDb } from "./sqlite.ts";
+import { getDb } from './sqlite.ts';
 
 function nowIso(): string {
   return new Date().toISOString();
@@ -43,29 +43,29 @@ export async function addTaskLocal(input: CreateTaskInput): Promise<void> {
     [
       input.title,
       input.category,
-      "outstanding",
+      'outstanding',
       input.source,
       input.date,
       timestamp,
       timestamp,
       null,
-    ]
+    ],
   );
 }
 
 export async function updateTaskStatusLocal(
   taskId: number,
-  nextStatus: "outstanding" | "completed"
+  nextStatus: 'outstanding' | 'completed',
 ): Promise<void> {
   const db = await getDb();
   const timestamp = nowIso();
-  const completedAt = nextStatus === "completed" ? timestamp : null;
+  const completedAt = nextStatus === 'completed' ? timestamp : null;
 
   await db.runAsync(
     `UPDATE taskentity
      SET status = ?, updated_at = ?, completed_at = ?
      WHERE id = ?`,
-    [nextStatus, timestamp, completedAt, taskId]
+    [nextStatus, timestamp, completedAt, taskId],
   );
 }
 
@@ -93,7 +93,7 @@ export async function savePlanLocal(input: SavePlanInput): Promise<void> {
       input.social_goal,
       timestamp,
       timestamp,
-    ]
+    ],
   );
 }
 
@@ -125,6 +125,6 @@ export async function saveCheckinLocal(input: SaveCheckinInput): Promise<void> {
       input.mood,
       input.notes,
       timestamp,
-    ]
+    ],
   );
 }

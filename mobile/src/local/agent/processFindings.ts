@@ -1,12 +1,12 @@
-import type { PatternFinding } from "../../domain/types.ts";
+import type { PatternFinding } from '../../domain/types.ts';
 
-function severityWeight(severity: PatternFinding["severity"]): number {
+function severityWeight(severity: PatternFinding['severity']): number {
   switch (severity) {
-    case "high":
+    case 'high':
       return 3;
-    case "medium":
+    case 'medium':
       return 2;
-    case "low":
+    case 'low':
       return 1;
     default:
       return 0;
@@ -73,7 +73,7 @@ function rankFindings(findings: PatternFinding[]): PatternFinding[] {
 
 function limitFindings(
   findings: PatternFinding[],
-  limit: number
+  limit: number,
 ): PatternFinding[] {
   return findings.slice(0, limit);
 }
