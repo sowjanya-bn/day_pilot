@@ -27,6 +27,9 @@ import {
   saveCheckinLocal,
 } from './src/local/storage/sqliteMutations.ts';
 
+import { buildActivityPayloadFromDb } from './src/local/export/buildActivityPayloadFromDb.ts';
+import { analyzeActivity } from './src/remote/analysisClient.ts';
+
 const API_BASE_URL = 'http://localhost:8000/api';
 const DEFAULT_DATE = '2026-03-30';
 
@@ -166,6 +169,37 @@ export default function App() {
   const [dateDraft, setDateDraft] = useState(DEFAULT_DATE);
   const [planInterventions, setPlanInterventions] = useState([]);
 
+  const [analysisWindow, setAnalysisWindow] = useState(7);
+const [weeklyInsights, setWeeklyInsights] = useState(null);
+const [analyzingActivity, setAnalyzingActivity] = useState(false);
+
+const runActivityAnalysis = async () => {
+  try {
+    setAnalyzingActivity(true);
+    setError(null);
+
+    const payload = await buildActivityPayloadFromDb(
+      selectedDate,
+      analysisWindow,
+      sqliteRepository,
+    );
+
+    const result = await analyzeActivity(payload);
+    setWeeklyInsights(result);
+  } catch (err) {
+    setError(
+      toAppErrorDetails(err, {
+        screen: 'App',
+        action: 'runActivityAnalysis',
+        selectedDate,
+        analysisWindow,
+      }),
+    );
+  } finally {
+    setAnalyzingActivity(false);
+  }
+};
+
   const [localTasks, setLocalTasks] = useState({
     outstanding: [],
     completed: [],
@@ -250,19 +284,18 @@ export default function App() {
   }, [brief]);
 
   useEffect(() => {
-    const outstanding = Array.isArray(localTasks?.outstanding)
-      ? localTasks.outstanding
-      : [];
+  const outstanding = Array.isArray(localTasks?.outstanding)
+    ? localTasks.outstanding
+    : [];
 
-    const interventions = evaluatePlan(outstanding, {
-      state: {
-        staleTaskIds: outstanding.map((t) => t.id),
-      },
-    });
+  const interventions = evaluatePlan(outstanding, {
+    state: {
+      staleTaskIds: outstanding.map((task) => task.id),
+    },
+  });
 
-    console.log('Evaluated plan interventions', { interventions });
-    setPlanInterventions(interventions);
-  }, [localTasks]);
+  setPlanInterventions(interventions);
+}, [localTasks]);
 
   useEffect(() => {
     loadBrief(DEFAULT_DATE);
@@ -536,6 +569,80 @@ export default function App() {
   const reflection = brief?.reflection ?? {};
   const debug = brief?.debug ?? {};
   const tasks = brief?.tasks ?? {};
+
+  const renderActivityAnalysis = () => (
+  <Card title="Analyze my activity">
+    <View style={styles.analysisControls}>
+      {[3, 7, 14].map((days) => (
+        <Pressable
+          key={days}
+          style={[
+            styles.analysisChip,
+            analysisWindow === days && styles.analysisChipActive,
+          ]}
+          onPress={() => setAnalysisWindow(days)}
+        >
+          <Text
+            style={[
+              styles.analysisChipText,
+              analysisWindow === days && styles.analysisChipTextActive,
+            ]}
+          >
+            {days}d
+          </Text>
+        </Pressable>
+      ))}
+    </View>
+
+    <Pressable
+      style={styles.primaryButton}
+      onPress={runActivityAnalysis}
+      disabled={analyzingActivity}
+    >
+      <Text style={styles.primaryButtonText}>
+        {analyzingActivity ? 'Analyzing...' : 'Run analysis'}
+      </Text>
+    </Pressable>
+
+    {weeklyInsights ? (
+      <View style={styles.expandedSection}>
+        {Array.isArray(weeklyInsights.patterns) &&
+          weeklyInsights.patterns.length > 0 && (
+            <>
+              <Text style={styles.label}>Patterns</Text>
+              {weeklyInsights.patterns.map((pattern, index) => (
+                <Text key={`weekly-pattern-${index}`} style={styles.listItem}>
+                  • {pattern}
+                </Text>
+              ))}
+            </>
+          )}
+
+        {Array.isArray(weeklyInsights.insights) &&
+          weeklyInsights.insights.length > 0 && (
+            <>
+              <Text style={styles.label}>Insights</Text>
+              {weeklyInsights.insights.map((insight, index) => (
+                <Text key={`weekly-insight-${index}`} style={styles.listItem}>
+                  • {insight}
+                </Text>
+              ))}
+            </>
+          )}
+
+        {Array.isArray(weeklyInsights.recommendations) &&
+          weeklyInsights.recommendations.length > 0 && (
+            <>
+              <Text style={styles.label}>Recommendation</Text>
+              <Text style={styles.value}>
+                {weeklyInsights.recommendations[0]}
+              </Text>
+            </>
+          )}
+      </View>
+    ) : null}
+  </Card>
+);
 
   const staleTaskTitles = useMemo(() => {
     const carryForward = Array.isArray(guidance?.carry_forward_tasks)
@@ -1170,7 +1277,12 @@ export default function App() {
             <Text style={styles.inlineError}>{getErrorDisplayText(error)}</Text>
           ) : null}
 
-          {screen === 'brief' && renderBrief()}
+          {screen === 'brief' && (
+              <>
+                {renderBrief()}
+                {renderActivityAnalysis()}
+              </>
+            )}
           {screen === 'plan' && renderPlanForm()}
           {screen === 'checkin' && renderCheckinForm()}
           {screen === 'tasks' && renderTasks()}
@@ -1587,4 +1699,30 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#444',
   },
+
+  analysisControls: {
+  flexDirection: 'row',
+  gap: 8,
+  marginBottom: 10,
+},
+
+analysisChip: {
+  backgroundColor: '#e9e9ee',
+  paddingHorizontal: 12,
+  paddingVertical: 8,
+  borderRadius: 999,
+},
+
+analysisChipActive: {
+  backgroundColor: '#111',
+},
+
+analysisChipText: {
+  color: '#333',
+  fontWeight: '600',
+},
+
+analysisChipTextActive: {
+  color: '#fff',
+},
 });
