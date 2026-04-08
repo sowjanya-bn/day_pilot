@@ -1,6 +1,6 @@
 # DayPilot
 
-DayPilot is a local-first, agent-assisted planning system that helps manage daily work with lightweight guidance and real-time feedback.
+DayPilot is a local-first, agent-assisted planning system that helps manage daily work with lightweight guidance, real-time feedback, and a personalised content briefing.
 
 It is designed to feel simple, fast and supportive rather than overwhelming.
 
@@ -13,7 +13,8 @@ It is designed to feel simple, fast and supportive rather than overwhelming.
 - Defer tasks to reduce daily load without losing them
 - Receive real-time nudges while planning
 - Generate structured daily insights and guidance
-- Optionally enhance guidance using a local LLM
+- Pull a personalised daily briefing — articles, tools and news matched to today's tasks
+- Browse plans and tasks across all days
 
 ---
 
@@ -35,8 +36,9 @@ Tasks → Context → Agent → Guidance → UI → Tasks
 ## Architecture overview
 
 ### Storage
-- SQLite (via Expo SQLite)
-- Tasks, plans and check-ins stored locally
+- SQLite (via Expo SQLite) on mobile
+- SQLite on backend (via SQLModel)
+- Tasks, plans and check-ins stored locally on device
 
 ### Agent pipeline
 - Builds a `DailyContext` from recent tasks
@@ -49,6 +51,20 @@ Tasks → Context → Agent → Guidance → UI → Tasks
   - findings
   - insights
   - guidance
+
+### Daily briefing (enrichment agent)
+- Triggered on demand from the Today screen
+- Posts today's tasks to the backend
+- Backend extracts topics from task titles and categories (compound-term aware: "react native", "machine learning" etc.)
+- Fans out in parallel to three content sources:
+  - Hacker News (Algolia search API)
+  - GitHub (repository search by topic)
+  - Dev.to (articles by tag)
+- Ranks and splits content into three buckets:
+  - **Learn** — tutorials, guides, how-tos matched to learning goals
+  - **Pulse** — news and discussion in your space
+  - **Tools** — relevant repos and libraries
+- Returns a `DailySnippet` displayed as a card with tappable links
 
 ### Interventions (real-time)
 - Evaluates current task list during planning
@@ -64,24 +80,56 @@ Tasks → Context → Agent → Guidance → UI → Tasks
 
 ---
 
-## UX behavior
+## UX behaviour
 
+- Opens to today's date automatically
 - Tasks update instantly (optimistic UI)
 - Interventions update immediately when tasks change
 - Defer moves tasks to the next day
+- Header date arrows (‹ ›) navigate across any day — Tasks tab updates to show that day
+- Plan tab shows all persisted plans (newest first, expandable) plus a form for the selected date
 - System never blocks user actions
 
 ---
 
 ## Project structure
 
-mobile/
-  src/
-    local/
-      agent/
-      storage/
-      llm/
-      utils/
+```
+day_pilot/
+├── backend/
+│   └── app/
+│       ├── api/routes/          # REST endpoints
+│       ├── flows/               # Orchestration (context, enrichment)
+│       ├── services/            # Business logic
+│       ├── integrations/        # HN, GitHub, Dev.to
+│       └── models/              # Pydantic models
+│
+└── mobile/
+    └── src/
+        ├── api/                 # Backend REST clients
+        ├── features/briefing/   # UI cards (briefing, snippet)
+        ├── local/
+        │   ├── agent/           # Local agent pipeline
+        │   ├── storage/         # SQLite abstraction
+        │   ├── llm/             # Ollama integration
+        │   └── brief/           # Daily brief pipeline
+        └── domain/              # TypeScript types
+```
+
+---
+
+## API endpoints
+
+| Method | Path | Purpose |
+|--------|------|---------|
+| GET | `/api/health` | Health check |
+| POST | `/api/context/today` | Build daily context (focus, outstanding, news) |
+| POST | `/api/briefing/daily` | Enrichment agent — returns Learn / Pulse / Tools snippet |
+| POST | `/api/analysis/daily` | Analyse activity patterns |
+| POST | `/api/tasks` | Create task |
+| GET | `/api/tasks/{day}` | List tasks for date |
+| PUT | `/api/tasks/{task_id}/status` | Update task status |
+| GET | `/api/stats/{day}` | Daily stats |
 
 ---
 
@@ -91,9 +139,19 @@ mobile/
 - React Native (Expo)
 - Local state + SQLite
 
+### Backend
+- Python / FastAPI
+- SQLite via SQLModel
+- httpx for async HTTP
+
 ### Agent
-- TypeScript-based rule system
-- No external dependency
+- TypeScript rule system (mobile, offline-first)
+- Python service (backend, REST-accessible)
+
+### Content sources
+- Hacker News Algolia API (no key required)
+- GitHub repository search API
+- Dev.to articles API (no key required)
 
 ### LLM (optional)
 - Ollama (local)
@@ -103,36 +161,57 @@ mobile/
 
 ## Development setup
 
+### Backend
+
+```bash
+cd backend
+python3 -m venv .daypilot
+source .daypilot/bin/activate
+pip install -r requirements.txt
+uvicorn app.main:app --reload
+```
+
 ### Mobile
 
+```bash
 cd mobile
 npm install
 npm start
-
----
+# Press i to open iOS simulator
+```
 
 ### Optional LLM
 
+```bash
 brew install ollama
 ollama pull phi3:mini
 ollama serve
+```
 
 ---
 
 ## Current status
 
-Phase 1 complete:
+Phase 2 complete:
 
 - Local-first data model
 - Agent pipeline (findings → insights → guidance)
 - Real-time planning interventions
 - Optimistic task updates (done, defer)
 - Optional LLM enhancement layer
+- Daily enrichment briefing (HN + GitHub + Dev.to, topic-aware)
+- Clean bottom-tab navigation (Today / Tasks / Plan / Log)
+- Plan history — all persisted plans browsable in the Plan tab
+- Cross-day task browsing via header date navigation
+- Auto-loads today's date on boot
 
 ---
 
 ## Next steps
 
+- Cache daily snippet by date (avoid re-fetching on every tap)
+- Trigger briefing automatically on boot
+- Add more content sources (Reddit, RSS, YouTube)
 - Improve intervention intelligence (pattern awareness)
 - Add stuck-task detection
 - Add weekly summaries

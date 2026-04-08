@@ -1,9 +1,11 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.routes import checkin, guidance, health, planner, brief, stats, voice, tasks, analysis
+from app.api.routes import analysis, health, stats, tasks
 from app.core.config import settings
 from app.db import create_db_and_tables
+from app.api.routes.context import router as context_router
+from app.api.routes.briefing import router as briefing_router
 
 
 app = FastAPI(title=settings.app_name, version="0.1.0")
@@ -23,14 +25,11 @@ app.add_middleware(
 )
 
 app.include_router(health.router, prefix="/api")
-app.include_router(planner.router, prefix="/api")
-app.include_router(checkin.router, prefix="/api")
-app.include_router(guidance.router, prefix="/api")
-app.include_router(brief.router, prefix="/api")
 app.include_router(stats.router, prefix="/api")
-app.include_router(voice.router, prefix="/api")
 app.include_router(tasks.router, prefix="/api")
 app.include_router(analysis.router, prefix="/api")
+app.include_router(context_router, prefix="/api")
+app.include_router(briefing_router, prefix="/api")
 
 
 @app.get("/")

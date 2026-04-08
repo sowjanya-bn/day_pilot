@@ -5,4 +5,6 @@ export interface DailyBriefRepository {
   getTasksInRange(startDate: string, endDate: string): Promise<Task[]>;
   getPlanForDate(date: string): Promise<TomorrowPlan | null>;
   getLatestCheckinBefore(date: string): Promise<DailyCheckin | null>;
+  getAllPlans(): Promise<TomorrowPlan[]>;
+  getAllTaskDates(): Promise<string[]>;
 }

@@ -129,4 +129,20 @@ export const sqliteRepository: DailyBriefRepository = {
     );
     return row ? mapCheckin(row) : null;
   },
+
+  async getAllPlans(): Promise<TomorrowPlan[]> {
+    const db = await getDb();
+    const rows = await db.getAllAsync<PlanRow>(
+      `SELECT * FROM tomorrowplanentity ORDER BY date DESC`,
+    );
+    return rows.map(mapPlan);
+  },
+
+  async getAllTaskDates(): Promise<string[]> {
+    const db = await getDb();
+    const rows = await db.getAllAsync<{ assigned_date: string }>(
+      `SELECT DISTINCT assigned_date FROM taskentity ORDER BY assigned_date DESC`,
+    );
+    return rows.map((r) => r.assigned_date);
+  },
 };

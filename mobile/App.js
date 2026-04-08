@@ -29,9 +29,11 @@ import {
 
 import { buildActivityPayloadFromDb } from './src/local/export/buildActivityPayloadFromDb.ts';
 import { analyzeActivity } from './src/remote/analysisClient.ts';
+import { fetchDailySnippet } from './src/api/briefing.ts';
+import { DailySnippetCard } from './src/features/briefing/DailySnippetCard.tsx';
 
 const API_BASE_URL = 'http://localhost:8000/api';
-const DEFAULT_DATE = '2026-03-30';
+const DEFAULT_DATE = getLocalIsoDate();
 
 function toAppErrorDetails(error, extra) {
   if (error instanceof Error) {
@@ -119,6 +121,17 @@ function getLocalIsoDate() {
   return `${year}-${month}-${day}`;
 }
 
+function formatFriendlyDate(isoDate) {
+  const [year, month, day] = isoDate.split('-').map(Number);
+  const d = new Date(Date.UTC(year, month - 1, day));
+  return d.toLocaleDateString('en-US', {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+    timeZone: 'UTC',
+  });
+}
+
 function formatShortReflection(patterns) {
   if (!Array.isArray(patterns) || patterns.length === 0) {
     return 'No strong signals today.';
@@ -137,7 +150,7 @@ export default function App() {
   const [brief, setBrief] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [screen, setScreen] = useState('brief');
+  const [screen, setScreen] = useState('today');
 
   const [selectedDate, setSelectedDate] = useState(DEFAULT_DATE);
 
@@ -173,6 +186,12 @@ export default function App() {
 const [weeklyInsights, setWeeklyInsights] = useState(null);
 const [analyzingActivity, setAnalyzingActivity] = useState(false);
 
+const [snippet, setSnippet] = useState(null);
+const [loadingSnippet, setLoadingSnippet] = useState(false);
+
+const [allPlans, setAllPlans] = useState([]);
+const [expandedPlanDate, setExpandedPlanDate] = useState(null);
+
 const runActivityAnalysis = async () => {
   try {
     setAnalyzingActivity(true);
@@ -200,10 +219,60 @@ const runActivityAnalysis = async () => {
   }
 };
 
+const runDailySnippet = async () => {
+  try {
+    setLoadingSnippet(true);
+    setError(null);
+
+    const allTasks = [
+      ...(localTasks.outstanding || []).map((t) => ({
+        id: String(t.id),
+        title: t.title,
+        status: 'planned',
+        assigned_date: t.assignedDate || selectedDate,
+        category: t.category || null,
+        priority: null,
+        defer_count: 0,
+      })),
+      ...(localTasks.completed || []).map((t) => ({
+        id: String(t.id),
+        title: t.title,
+        status: 'completed',
+        assigned_date: t.assignedDate || selectedDate,
+        category: t.category || null,
+        priority: null,
+        defer_count: 0,
+      })),
+    ];
+
+    const result = await fetchDailySnippet(allTasks);
+    setSnippet(result);
+  } catch (err) {
+    setError(
+      toAppErrorDetails(err, {
+        screen: 'App',
+        action: 'runDailySnippet',
+        selectedDate,
+      }),
+    );
+  } finally {
+    setLoadingSnippet(false);
+  }
+};
+
   const [localTasks, setLocalTasks] = useState({
     outstanding: [],
     completed: [],
   });
+
+  const loadAllPlans = async () => {
+    try {
+      const plans = await sqliteRepository.getAllPlans();
+      setAllPlans(plans);
+    } catch (err) {
+      console.error('Failed to load plans', err);
+    }
+  };
 
   const loadBrief = async (day = selectedDate) => {
     try {
@@ -256,6 +325,7 @@ const runActivityAnalysis = async () => {
       try {
         await initDb();
         await seedDb();
+        await loadAllPlans();
         console.log('DB initialized');
       } catch (err) {
         const details = toAppErrorDetails(err, {
@@ -501,8 +571,9 @@ const runActivityAnalysis = async () => {
       };
 
       await savePlanLocal(payload);
+      await loadAllPlans();
       await changeDateAndLoad(planDate);
-      setScreen('brief');
+      setScreen('today');
     } catch (err) {
       setError(
         toAppErrorDetails(err, {
@@ -550,7 +621,7 @@ const runActivityAnalysis = async () => {
 
       await saveCheckinLocal(payload);
       await changeDateAndLoad(checkinDate);
-      setScreen('brief');
+      setScreen('today');
     } catch (err) {
       setError(
         toAppErrorDetails(err, {
@@ -723,6 +794,20 @@ const runActivityAnalysis = async () => {
           </Text>
         </Card>
 
+        <View style={{ marginHorizontal: 16, marginTop: 12 }}>
+          <Pressable
+            style={[styles.primaryButton, loadingSnippet && { opacity: 0.6 }]}
+            onPress={runDailySnippet}
+            disabled={loadingSnippet}
+          >
+            <Text style={styles.primaryButtonText}>
+              {loadingSnippet ? 'Building briefing...' : 'Get daily briefing'}
+            </Text>
+          </Pressable>
+        </View>
+
+        {snippet && <DailySnippetCard snippet={snippet} />}
+
         {shortPatterns.length > 0 || reflection?.insight ? (
           <Card title="Reflection">
             {/* Insight */}
@@ -885,6 +970,13 @@ const runActivityAnalysis = async () => {
 
   const renderTasks = () => (
     <>
+      <View style={styles.tabDateLabel}>
+        <Text style={styles.tabDateLabelText}>
+          {formatFriendlyDate(selectedDate)}
+        </Text>
+        <Text style={styles.tabDateLabelHint}>Use ‹ › above to browse days</Text>
+      </View>
+
       {planInterventions.length > 0 && (
         <View style={styles.nudge}>
           <Text style={styles.nudgeText}>{planInterventions[0].message}</Text>
@@ -975,83 +1067,124 @@ const runActivityAnalysis = async () => {
   );
 
   const renderPlanForm = () => (
-    <Card title="Create plan">
-      <Pressable
-        style={styles.primaryButton}
-        onPress={submitPlan}
-        disabled={submittingPlan}
-      >
-        <Text style={styles.primaryButtonText}>
-          {submittingPlan ? 'Saving...' : 'Save plan'}
-        </Text>
-      </Pressable>
+    <>
+      {allPlans.length > 0 && (
+        <Card title="All plans">
+          {allPlans.map((plan) => {
+            const isExpanded = expandedPlanDate === plan.date;
+            return (
+              <Pressable
+                key={plan.date}
+                onPress={() => setExpandedPlanDate(isExpanded ? null : plan.date)}
+                style={styles.planRow}
+              >
+                <View style={styles.planRowHeader}>
+                  <Text style={styles.planRowDate}>
+                    {formatFriendlyDate(plan.date)}
+                  </Text>
+                  {plan.agenda ? (
+                    <Text style={styles.planRowAgenda} numberOfLines={1}>
+                      {plan.agenda}
+                    </Text>
+                  ) : null}
+                  <Text style={styles.planRowChevron}>{isExpanded ? '∧' : '∨'}</Text>
+                </View>
 
-      <FormField label="Date">
-        <TextInput
-          value={planDate}
-          onChangeText={setPlanDate}
-          style={styles.input}
-          placeholder="YYYY-MM-DD"
-        />
-      </FormField>
+                {isExpanded && (
+                  <View style={styles.planRowDetail}>
+                    {plan.topPriorities?.length > 0 && (
+                      <>
+                        <Text style={styles.label}>Priorities</Text>
+                        {plan.topPriorities.map((p, i) => (
+                          <Text key={i} style={styles.listItem}>• {p}</Text>
+                        ))}
+                      </>
+                    )}
+                    {plan.learningGoal ? (
+                      <>
+                        <Text style={styles.label}>Learning</Text>
+                        <Text style={styles.value}>{plan.learningGoal}</Text>
+                      </>
+                    ) : null}
+                    {plan.jobGoal ? (
+                      <>
+                        <Text style={styles.label}>Job</Text>
+                        <Text style={styles.value}>{plan.jobGoal}</Text>
+                      </>
+                    ) : null}
+                    {plan.socialGoal ? (
+                      <>
+                        <Text style={styles.label}>Social</Text>
+                        <Text style={styles.value}>{plan.socialGoal}</Text>
+                      </>
+                    ) : null}
+                  </View>
+                )}
+              </Pressable>
+            );
+          })}
+        </Card>
+      )}
 
-      <FormField label="Agenda">
-        <TextInput
-          value={agenda}
-          onChangeText={setAgenda}
-          style={[styles.input, styles.textArea]}
-          placeholder="Keep the day light and focused"
-          multiline
-        />
-      </FormField>
+      <Card title={`Plan for ${formatFriendlyDate(planDate)}`}>
+        <FormField label="Agenda">
+          <TextInput
+            value={agenda}
+            onChangeText={setAgenda}
+            style={[styles.input, styles.textArea]}
+            placeholder="Keep the day light and focused"
+            multiline
+          />
+        </FormField>
 
-      <FormField label="Top priorities (one per line)">
-        <TextInput
-          value={topPrioritiesText}
-          onChangeText={setTopPrioritiesText}
-          style={[styles.input, styles.textArea]}
-          placeholder={'Finish coursework\nApply to one role\nGo for a walk'}
-          multiline
-        />
-      </FormField>
+        <FormField label="Top priorities (one per line)">
+          <TextInput
+            value={topPrioritiesText}
+            onChangeText={setTopPrioritiesText}
+            style={[styles.input, styles.textArea]}
+            placeholder={'Finish coursework\nApply to one role\nGo for a walk'}
+            multiline
+          />
+        </FormField>
 
-      <FormField label="Learning goal">
-        <TextInput
-          value={learningGoal}
-          onChangeText={setLearningGoal}
-          style={styles.input}
-          placeholder="Review service layer design"
-        />
-      </FormField>
+        <FormField label="Learning goal">
+          <TextInput
+            value={learningGoal}
+            onChangeText={setLearningGoal}
+            style={styles.input}
+            placeholder="Review service layer design"
+          />
+        </FormField>
 
-      <FormField label="Job goal">
-        <TextInput
-          value={jobGoal}
-          onChangeText={setJobGoal}
-          style={styles.input}
-          placeholder="Refine one CV bullet"
-        />
-      </FormField>
+        <FormField label="Job goal">
+          <TextInput
+            value={jobGoal}
+            onChangeText={setJobGoal}
+            style={styles.input}
+            placeholder="Refine one CV bullet"
+          />
+        </FormField>
 
-      <FormField label="Social goal">
-        <TextInput
-          value={socialGoal}
-          onChangeText={setSocialGoal}
-          style={styles.input}
-          placeholder="Send one small message"
-        />
-      </FormField>
+        <FormField label="Social goal">
+          <TextInput
+            value={socialGoal}
+            onChangeText={setSocialGoal}
+            style={styles.input}
+            placeholder="Send one small message"
+          />
+        </FormField>
 
-      <Pressable
-        style={styles.primaryButton}
-        onPress={submitPlan}
-        disabled={submittingPlan}
-      >
-        <Text style={styles.primaryButtonText}>
-          {submittingPlan ? 'Saving...' : 'Save plan'}
-        </Text>
-      </Pressable>
-    </Card>
+        <Pressable
+          style={styles.primaryButton}
+          onPress={submitPlan}
+          disabled={submittingPlan}
+        >
+          <Text style={styles.primaryButtonText}>
+            {submittingPlan ? 'Saving...' : 'Save plan'}
+          </Text>
+        </Pressable>
+      </Card>
+    </>
   );
 
   const renderCheckinForm = () => (
@@ -1237,63 +1370,46 @@ const runActivityAnalysis = async () => {
   return (
     <SafeAreaView style={styles.container}>
       <KeyboardAvoidingView
-        style={styles.container}
+        style={styles.flex}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         keyboardVerticalOffset={20}
       >
+        <View style={styles.header}>
+          <Text style={styles.title}>DayPilot</Text>
+          <View style={styles.dateNav}>
+            <Pressable style={styles.dateNavButton} onPress={goToPreviousDay}>
+              <Text style={styles.dateNavArrow}>‹</Text>
+            </Pressable>
+            <Pressable onPress={goToToday}>
+              <Text style={styles.dateLabel}>{formatFriendlyDate(selectedDate)}</Text>
+            </Pressable>
+            <Pressable style={styles.dateNavButton} onPress={goToNextDay}>
+              <Text style={styles.dateNavArrow}>›</Text>
+            </Pressable>
+          </View>
+        </View>
+
+        {error ? (
+          <Text style={styles.inlineError}>{getErrorDisplayText(error)}</Text>
+        ) : null}
+
         <ScrollView
           contentContainerStyle={styles.content}
           keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator
+          showsVerticalScrollIndicator={false}
         >
-          <Text style={styles.title}>DayPilot</Text>
-
-          {renderGlobalDatePanel()}
-
-          <View style={styles.navRow}>
-            <NavButton
-              label="Brief"
-              active={screen === 'brief'}
-              onPress={() => setScreen('brief')}
-            />
-            <NavButton
-              label="Plan"
-              active={screen === 'plan'}
-              onPress={() => setScreen('plan')}
-            />
-            <NavButton
-              label="Check-in"
-              active={screen === 'checkin'}
-              onPress={() => setScreen('checkin')}
-            />
-            <NavButton
-              label="Tasks"
-              active={screen === 'tasks'}
-              onPress={() => setScreen('tasks')}
-            />
-          </View>
-
-          {error ? (
-            <Text style={styles.inlineError}>{getErrorDisplayText(error)}</Text>
-          ) : null}
-
-          {screen === 'brief' && (
-              <>
-                {renderBrief()}
-                {renderActivityAnalysis()}
-              </>
-            )}
-          {screen === 'plan' && renderPlanForm()}
-          {screen === 'checkin' && renderCheckinForm()}
+          {screen === 'today' && renderBrief()}
           {screen === 'tasks' && renderTasks()}
-
-          <Pressable
-            style={styles.secondaryButton}
-            onPress={() => loadBrief(selectedDate)}
-          >
-            <Text style={styles.secondaryButtonText}>Refresh brief</Text>
-          </Pressable>
+          {screen === 'plan' && renderPlanForm()}
+          {screen === 'log' && renderCheckinForm()}
         </ScrollView>
+
+        <View style={styles.tabBar}>
+          <TabItem label="Today" id="today" screen={screen} onPress={setScreen} />
+          <TabItem label="Tasks" id="tasks" screen={screen} onPress={setScreen} />
+          <TabItem label="Plan" id="plan" screen={screen} onPress={setScreen} />
+          <TabItem label="Log" id="log" screen={screen} onPress={setScreen} />
+        </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -1332,6 +1448,18 @@ function NavButton({ label, active, onPress }) {
   );
 }
 
+function TabItem({ label, id, screen, onPress }) {
+  const active = screen === id;
+  return (
+    <Pressable style={styles.tabItem} onPress={() => onPress(id)}>
+      <Text style={[styles.tabItemText, active && styles.tabItemTextActive]}>
+        {label}
+      </Text>
+      {active && <View style={styles.tabItemDot} />}
+    </Pressable>
+  );
+}
+
 function StatChip({ label, value }) {
   return (
     <View style={styles.statChip}>
@@ -1346,10 +1474,77 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#f6f7fb',
   },
+  flex: {
+    flex: 1,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    paddingBottom: 10,
+    backgroundColor: '#f6f7fb',
+    borderBottomWidth: 1,
+    borderBottomColor: '#ebebef',
+  },
+  dateNav: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  dateNavButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#e9e9ee',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  dateNavArrow: {
+    fontSize: 20,
+    color: '#333',
+    lineHeight: 24,
+  },
+  dateLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#333',
+    minWidth: 90,
+    textAlign: 'center',
+  },
+  tabBar: {
+    flexDirection: 'row',
+    borderTopWidth: 1,
+    borderTopColor: '#ebebef',
+    backgroundColor: '#fff',
+    paddingBottom: Platform.OS === 'ios' ? 0 : 4,
+  },
+  tabItem: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: 12,
+    gap: 4,
+  },
+  tabItemText: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: '#999',
+  },
+  tabItemTextActive: {
+    color: '#111',
+    fontWeight: '700',
+  },
+  tabItemDot: {
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: '#111',
+  },
   content: {
-    padding: 20,
-    paddingBottom: 120,
-    gap: 16,
+    padding: 16,
+    paddingBottom: 32,
+    gap: 12,
   },
   centered: {
     flex: 1,
@@ -1363,8 +1558,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   title: {
-    fontSize: 28,
+    fontSize: 20,
     fontWeight: '700',
+    color: '#111',
   },
   subtitle: {
     fontSize: 16,
@@ -1688,6 +1884,49 @@ const styles = StyleSheet.create({
   severityMedium: { color: '#555' },
   severityLow: { color: '#888' },
 
+  tabDateLabel: {
+    paddingHorizontal: 4,
+    paddingBottom: 4,
+  },
+  tabDateLabelText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#111',
+  },
+  tabDateLabelHint: {
+    fontSize: 12,
+    color: '#999',
+    marginTop: 2,
+  },
+  planRow: {
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  planRowHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  planRowDate: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#111',
+    minWidth: 90,
+  },
+  planRowAgenda: {
+    flex: 1,
+    fontSize: 13,
+    color: '#666',
+  },
+  planRowChevron: {
+    fontSize: 12,
+    color: '#999',
+  },
+  planRowDetail: {
+    marginTop: 8,
+    paddingLeft: 4,
+  },
   nudge: {
     backgroundColor: '#fff3cd',
     padding: 10,
