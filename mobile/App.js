@@ -121,6 +121,37 @@ function getLocalIsoDate() {
   return `${year}-${month}-${day}`;
 }
 
+const COLORS = {
+  accent:  '#4f46e5',
+  learn:   '#10b981',
+  pulse:   '#3b82f6',
+  tools:   '#f59e0b',
+  danger:  '#ef4444',
+};
+
+const CATEGORY_COLORS = {
+  engineering: '#3b82f6',
+  backend:     '#3b82f6',
+  frontend:    '#6366f1',
+  mobile:      '#6366f1',
+  learning:    '#10b981',
+  career:      '#8b5cf6',
+  job:         '#8b5cf6',
+  design:      '#ec4899',
+  data:        '#06b6d4',
+  devops:      '#f59e0b',
+  security:    '#ef4444',
+  admin:       '#94a3b8',
+  general:     '#94a3b8',
+  work:        '#3b82f6',
+  personal:    '#10b981',
+};
+
+function getCategoryColor(category) {
+  if (!category) return '#94a3b8';
+  return CATEGORY_COLORS[category.toLowerCase()] ?? '#94a3b8';
+}
+
 function formatFriendlyDate(isoDate) {
   const [year, month, day] = isoDate.split('-').map(Number);
   const d = new Date(Date.UTC(year, month - 1, day));
@@ -1016,6 +1047,7 @@ const runDailySnippet = async () => {
         {localTasks.outstanding.length ? (
           localTasks.outstanding.map((task) => (
             <View key={task.id} style={styles.taskRow}>
+              <View style={[styles.categoryDot, { backgroundColor: getCategoryColor(task.category) }]} />
               <View style={styles.taskTextBlock}>
                 <Text style={styles.taskText}>{task.title}</Text>
                 <Text style={styles.taskMeta}>
@@ -1045,6 +1077,7 @@ const runDailySnippet = async () => {
         {localTasks.completed.length ? (
           localTasks.completed.map((task) => (
             <View key={task.id} style={styles.taskRow}>
+              <View style={[styles.categoryDot, { backgroundColor: getCategoryColor(task.category), opacity: 0.35 }]} />
               <View style={styles.taskTextBlock}>
                 <Text style={styles.completedTaskText}>{task.title}</Text>
                 <Text style={styles.taskMeta}>
@@ -1532,14 +1565,14 @@ const styles = StyleSheet.create({
     color: '#999',
   },
   tabItemTextActive: {
-    color: '#111',
+    color: '#4f46e5',
     fontWeight: '700',
   },
   tabItemDot: {
     width: 4,
     height: 4,
     borderRadius: 2,
-    backgroundColor: '#111',
+    backgroundColor: '#4f46e5',
   },
   content: {
     padding: 16,
@@ -1660,7 +1693,7 @@ const styles = StyleSheet.create({
   },
   primaryButton: {
     marginTop: 10,
-    backgroundColor: '#111',
+    backgroundColor: '#4f46e5',
     paddingVertical: 12,
     borderRadius: 12,
     alignItems: 'center',
@@ -1744,7 +1777,7 @@ const styles = StyleSheet.create({
     textDecorationLine: 'line-through',
   },
   taskActionButton: {
-    backgroundColor: '#111',
+    backgroundColor: '#4f46e5',
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 10,
@@ -1764,6 +1797,13 @@ const styles = StyleSheet.create({
     color: '#111',
     fontWeight: '700',
     fontSize: 13,
+  },
+  categoryDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginTop: 2,
+    flexShrink: 0,
   },
   taskTextBlock: {
     flex: 1,
@@ -1811,7 +1851,7 @@ const styles = StyleSheet.create({
   statChipValue: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#111',
+    color: '#4f46e5',
   },
   inlineToggle: {
     marginTop: 10,
