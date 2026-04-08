@@ -1,4 +1,5 @@
-const ANALYSIS_API_URL = 'http://127.0.0.1:8000/api/analysis/activity';
+import { API_BASE } from '../config';
+const ANALYSIS_API_URL = `${API_BASE}/api/analysis/activity`;
 
 export async function analyzeActivity(payload: unknown) {
   const response = await fetch(ANALYSIS_API_URL, {

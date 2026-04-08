@@ -1,0 +1,10 @@
+.daypilot/
+__pycache__/
+*.pyc
+*.pyo
+*.db
+*.db.bak
+.env
+tests/
+README.md
+fly.toml

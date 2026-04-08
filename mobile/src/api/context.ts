@@ -37,7 +37,8 @@ export type ContextTodayResponse = {
   nudge?: string | null;
 };
 
-const API_BASE = "http://127.0.0.1:8000/api";
+import { API_BASE as BASE_URL } from '../config';
+const API_BASE = `${BASE_URL}/api`;
 
 export async function fetchTodayContext(tasks: InputTask[]): Promise<ContextTodayResponse> {
   const res = await fetch(`${API_BASE}/context/today`, {

@@ -1,6 +1,7 @@
 import type { InputTask } from './context';
 
-const API_BASE = 'http://127.0.0.1:8000/api';
+import { API_BASE as BASE_URL } from '../config';
+const API_BASE = `${BASE_URL}/api`;
 
 export type SnippetItem = {
   title: string;
@@ -18,15 +19,23 @@ export type DailySnippet = {
 };
 
 export async function fetchDailySnippet(tasks: InputTask[]): Promise<DailySnippet> {
-  const res = await fetch(`${API_BASE}/briefing/daily`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ tasks, max_learn: 5, max_pulse: 5, max_tools: 3 }),
-  });
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 40000); // 40s for cold start
 
-  if (!res.ok) {
-    throw new Error(`Briefing request failed: ${res.status}`);
+  try {
+    const res = await fetch(`${API_BASE}/briefing/daily`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tasks, max_learn: 5, max_pulse: 5, max_tools: 3 }),
+      signal: controller.signal,
+    });
+
+    if (!res.ok) {
+      throw new Error(`Briefing request failed: ${res.status}`);
+    }
+
+    return res.json();
+  } finally {
+    clearTimeout(timeout);
   }
-
-  return res.json();
 }

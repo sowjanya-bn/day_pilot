@@ -32,7 +32,8 @@ import { analyzeActivity } from './src/remote/analysisClient.ts';
 import { fetchDailySnippet } from './src/api/briefing.ts';
 import { DailySnippetCard } from './src/features/briefing/DailySnippetCard.tsx';
 
-const API_BASE_URL = 'http://localhost:8000/api';
+import { API_BASE as _API_BASE } from './src/config.ts';
+const API_BASE_URL = `${_API_BASE}/api`;
 const DEFAULT_DATE = getLocalIsoDate();
 
 function toAppErrorDetails(error, extra) {
