@@ -14,6 +14,7 @@ import {
 import * as Clipboard from 'expo-clipboard';
 
 import { getDailyBriefLocal } from './src/local/brief/getDailyBriefLocal.ts';
+import { ollamaEnhancer } from './src/local/llm/ollamaEnhancer.ts';
 import { sqliteRepository } from './src/local/storage/sqliteRepository';
 import { mapLocalBriefToUiShape } from './src/local/brief/mapLocalBriefToUiShape.ts';
 import { initDb, seedDb } from './src/local/storage/sqlite.ts';
@@ -28,7 +29,7 @@ import {
 } from './src/local/storage/sqliteMutations.ts';
 
 import { buildActivityPayloadFromDb } from './src/local/export/buildActivityPayloadFromDb.ts';
-import { analyzeActivity } from './src/remote/analysisClient.ts';
+import { fetchAnalysis } from './src/remote/analysisClient.ts';
 import { fetchDailySnippet } from './src/api/briefing.ts';
 import { DailySnippetCard } from './src/features/briefing/DailySnippetCard.tsx';
 
@@ -235,7 +236,7 @@ const runActivityAnalysis = async () => {
       sqliteRepository,
     );
 
-    const result = await analyzeActivity(payload);
+    const result = await fetchAnalysis(payload);
     setWeeklyInsights(result);
   } catch (err) {
     setError(
@@ -312,7 +313,7 @@ const runDailySnippet = async () => {
       setError(null);
 
       if (USE_LOCAL_BRIEF) {
-        const localBrief = await getDailyBriefLocal(day, sqliteRepository);
+        const localBrief = await getDailyBriefLocal(day, sqliteRepository, ollamaEnhancer);
         const uiBrief = mapLocalBriefToUiShape(localBrief);
         //        console.log("Loaded brief from local DB", { day, localBrief, uiBrief });
         //

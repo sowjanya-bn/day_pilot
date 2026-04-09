@@ -1,25 +1,13 @@
 import type { DailyBriefRepository } from '../storage/repository.ts';
+import type { AnalysisRequest, DailyActivityRecord } from '../../remote/analysisClient.ts';
 import { shiftDate } from '../../utils/date.ts';
-
-type ActivityDay = {
-  date: string;
-  tasks: {
-    completed: number;
-    outstanding: number;
-    categories: Record<string, number>;
-  };
-  checkin: {
-    mood: string;
-    blockers: string[];
-  } | null;
-};
 
 export async function buildActivityPayloadFromDb(
   endDate: string,
   windowDays: number,
   repository: DailyBriefRepository,
-) {
-  const days: ActivityDay[] = [];
+): Promise<AnalysisRequest> {
+  const days: DailyActivityRecord[] = [];
 
   for (let i = 0; i < windowDays; i++) {
     const date = shiftDate(endDate, -i);
@@ -43,17 +31,13 @@ export async function buildActivityPayloadFromDb(
         categories,
       },
       checkin: checkin
-        ? {
-            mood: checkin.mood,
-            blockers: checkin.blockers,
-          }
+        ? { mood: checkin.mood, blockers: checkin.blockers }
         : null,
     });
   }
 
   return {
-    windowDays,
-    endDate,
+    end_date: endDate,
     days,
   };
 }

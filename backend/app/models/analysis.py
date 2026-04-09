@@ -1,40 +1,36 @@
-from typing import Literal
+from typing import Literal, Optional
 
 from pydantic import BaseModel
 
-
-class TaskContext(BaseModel):
-    id: int
-    title: str
-    status: Literal["planned", "completed", "cancelled"]
-    category: str | None = None
-    source: str | None = None
+from app.agents.schemas import GuidanceItem, Insight, PatternFinding
 
 
-class DailyStatsContext(BaseModel):
-    planned: int
+class CheckinSummary(BaseModel):
+    mood: str
+    blockers: list[str] = []
+
+
+class TaskDaySummary(BaseModel):
     completed: int
-    cancelled: int = 0
+    outstanding: int
+    categories: dict[str, int] = {}
 
 
-class DailyAnalysisRequest(BaseModel):
+class DailyActivityRecord(BaseModel):
     date: str
-    tasks: list[TaskContext]
-    stats: DailyStatsContext
+    tasks: TaskDaySummary
+    checkin: Optional[CheckinSummary] = None
 
 
-class Finding(BaseModel):
-    type: str
-    severity: Literal["low", "medium", "high"]
-    title: str
-    message: str
+class AnalysisRequest(BaseModel):
+    end_date: str
+    days: list[DailyActivityRecord]
 
 
-class Suggestion(BaseModel):
-    type: str
-    message: str
-
-
-class DailyAnalysisResponse(BaseModel):
-    findings: list[Finding]
-    suggestions: list[Suggestion]
+class AnalysisResponse(BaseModel):
+    period: str
+    end_date: str
+    window_days: int
+    findings: list[PatternFinding]
+    insights: list[Insight]
+    guidance: list[GuidanceItem]

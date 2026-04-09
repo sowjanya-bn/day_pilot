@@ -5,57 +5,6 @@ import type {
   PatternFinding,
 } from '../../domain/types.ts';
 
-import type { AgentReport, Task } from '../../domain/types.ts';
-import type { LLMEnhancer } from '../llm/enhancer.ts';
-
-export async function buildGuidanceFromAgentAndTasks(
-  date: string,
-  todaysTasks: Task[],
-  agentReport: AgentReport,
-  enhancer?: LLMEnhancer,
-) {
-  const guidanceItems = agentReport.guidance ?? [];
-  const primary = guidanceItems[0];
-
-  //   console.log('Agent Report Findings:', agentReport.findings);
-
-  const carryForwardTasks = todaysTasks
-    .filter((task) => task.status === 'outstanding')
-    .map((task) => task.title);
-
-  const fallbackMessage =
-    carryForwardTasks.length > 0
-      ? 'Focus on finishing one existing task before adding new work.'
-      : 'Keep the day simple and move one important thing forward.';
-
-  const baseMessage = primary?.message ?? fallbackMessage;
-
-  let enhancedMessage: string | null = null;
-
-  console.log('Enhanced Guidance Message:', enhancedMessage);
-
-  if (enhancer && primary) {
-    console.log('Enhancing guidance message with LLM Enhancer...');
-    enhancedMessage = await enhancer.enhanceGuidance({
-      findings: agentReport.findings.map((f) => f.summary),
-      insight: agentReport.insights[0]?.message,
-      guidance: primary.message,
-    });
-    console.log('Enhanced Guidance Message:', enhancedMessage);
-  }
-
-  return {
-    date,
-    focusMessage: enhancedMessage ?? baseMessage,
-    suggestedLearningNextStep:
-      'Spend 20 minutes on your current learning goal.',
-    suggestedJobNudge: 'Take one small job-search action today.',
-    suggestedSocialNudge:
-      'Send one small message or start one light conversation.',
-    carryForwardTasks,
-  };
-}
-
 export function generateGuidance(
   _context: DailyContext,
   findings: PatternFinding[],
@@ -110,7 +59,7 @@ export function generateGuidance(
       priority: 'high',
       title: "Reduce tomorrow's load",
       message:
-        'Cap tomorrow’s plan at 3 tasks and finish one older task before adding anything new.',
+        'Cap tomorrow\'s plan at 3 tasks and finish one older task before adding anything new.',
       action: 'cap_tomorrow_tasks',
       parameters: { maxTasks: 3 },
     });
@@ -137,7 +86,7 @@ export function generateGuidance(
       priority: 'medium',
       title: "Reduce tomorrow's load",
       message:
-        'Cap tomorrow’s plan at 2 to 3 meaningful tasks so completion feels more realistic.',
+        'Cap tomorrow\'s plan at 2 to 3 meaningful tasks so completion feels more realistic.',
       action: 'reduce_plan_size',
       parameters: { maxTasks: 3 },
     });
@@ -151,7 +100,7 @@ export function generateGuidance(
       priority: 'medium',
       title: 'Add one neglected area',
       message:
-        'Include one task from a less-active category in tomorrow’s plan to keep the week balanced.',
+        'Include one task from a less-active category in tomorrow\'s plan to keep the week balanced.',
       action: 'add_category_slot',
     });
 

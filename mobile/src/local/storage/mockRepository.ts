@@ -100,4 +100,12 @@ export const mockRepository: DailyBriefRepository = {
   async getLatestCheckinBefore(date: string): Promise<DailyCheckin | null> {
     return yesterdayCheckin.date < date ? yesterdayCheckin : null;
   },
+
+  async getAllPlans(): Promise<TomorrowPlan[]> {
+    return [plan];
+  },
+
+  async getAllTaskDates(): Promise<string[]> {
+    return [...new Set(tasks.map((t) => t.assignedDate))].sort().reverse();
+  },
 };

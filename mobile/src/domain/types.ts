@@ -7,7 +7,32 @@ export interface Task {
   source: string;
   status: TaskStatus;
   assignedDate: string;
+  createdAt: string;
+  updatedAt: string;
   completedAt?: string | null;
+}
+
+export interface TomorrowPlan {
+  id: number;
+  date: string;
+  agenda: string | null;
+  topPriorities: string[];
+  learningGoal: string | null;
+  jobGoal: string | null;
+  socialGoal: string | null;
+}
+
+export interface DailyCheckin {
+  id: number;
+  date: string;
+  completed: string[];
+  incomplete: string[];
+  blockers: string[];
+  carryForward: string[];
+  learned: string | null;
+  smallWin: string | null;
+  mood: string;
+  notes: string | null;
 }
 
 export interface WindowStats {
@@ -73,6 +98,59 @@ export interface GuidanceItem {
 
 export interface AgentReport {
   date: string;
+  findings: PatternFinding[];
+  insights: Insight[];
+  guidance: GuidanceItem[];
+}
+
+export interface DailyStats {
+  date: string;
+  planningStreak: number;
+  checkinStreak: number;
+  completedTasksLast7Days: number;
+  incompleteTasksLast7Days: number;
+}
+
+export interface DailyTaskList {
+  date: string;
+  outstanding: Task[];
+  completed: Task[];
+}
+
+export interface CarryForwardGuidance {
+  date: string;
+  focusMessage: string;
+  suggestedLearningNextStep: string;
+  suggestedJobNudge: string;
+  suggestedSocialNudge: string;
+  carryForwardTasks: string[];
+}
+
+export interface AgentBriefReflection {
+  patterns: string[];
+  insight: string | null;
+  nextSteps: string[];
+}
+
+export interface DailyBrief {
+  date: string;
+  plan: TomorrowPlan | null;
+  yesterdayReflection: DailyCheckin | null;
+  guidance: CarryForwardGuidance;
+  stats: DailyStats;
+  tasks: DailyTaskList;
+  reflection: AgentBriefReflection | null;
+  debug: {
+    findings: PatternFinding[];
+    insights: Insight[];
+    guidance: GuidanceItem[];
+  };
+}
+
+export interface AnalysisResponse {
+  period: string;
+  end_date: string;
+  window_days: number;
   findings: PatternFinding[];
   insights: Insight[];
   guidance: GuidanceItem[];

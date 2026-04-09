@@ -16,10 +16,6 @@ export function evaluatePlan(
   const taskCount = todaysTasks.length;
   const staleCount = context.state?.staleTaskIds?.length ?? 0;
 
-  console.log(
-    `Evaluating plan with ${taskCount} tasks, ${staleCount} stale tasks, categories: ${[...new Set(todaysTasks.map((t) => t.category))].join(', ')}`,
-  );
-
   // --- 1. Overload detection ---
   if (taskCount >= 6) {
     interventions.push({

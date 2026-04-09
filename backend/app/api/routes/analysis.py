@@ -1,11 +1,16 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Query
 
-from app.models.analysis import DailyAnalysisRequest, DailyAnalysisResponse
-from app.services.analysis_service import analyze_daily_context
+from app.agents.analyzer import StatelessAnalyzer
+from app.models.analysis import AnalysisRequest, AnalysisResponse
 
 router = APIRouter(prefix="/analysis", tags=["analysis"])
 
+_analyzer = StatelessAnalyzer()
 
-@router.post("/daily", response_model=DailyAnalysisResponse)
-def analyze_daily(payload: DailyAnalysisRequest) -> DailyAnalysisResponse:
-    return analyze_daily_context(payload)
+
+@router.post("", response_model=AnalysisResponse)
+def analyze(
+    payload: AnalysisRequest,
+    period: str = Query(default="weekly", pattern="^(weekly|fortnightly|monthly)$"),
+) -> AnalysisResponse:
+    return _analyzer.analyze(payload, period)

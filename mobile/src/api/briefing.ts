@@ -22,6 +22,8 @@ export async function fetchDailySnippet(tasks: InputTask[]): Promise<DailySnippe
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 40000); // 40s for cold start
 
+  console.log('Fetching daily snippet with tasks:', tasks);
+
   try {
     const res = await fetch(`${API_BASE}/briefing/daily`, {
       method: 'POST',
